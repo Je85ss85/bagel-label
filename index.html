@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>貝果營養標示系統</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" crossorigin="anonymous">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<style>
+  :root{
+    --paper:#F6F3EC;
+    --panel:#FFFFFF;
+    --ink:#2B2621;
+    --ink-soft:#6B6258;
+    --rule:#D8D1C2;
+    --rule-strong:#B8AE99;
+    --wheat:#A9791F;
+    --wheat-soft:#F1E4C6;
+    --rye:#5B4636;
+    --stamp:#A6362F;
+    --stamp-soft:#F5DEDB;
+    --ok:#1B7A3D;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Noto Sans TC','Helvetica Neue',sans-serif;line-height:1.55;}
+  .app{display:grid;grid-template-columns:280px 1fr;min-height:100vh;}
+  .sidebar{background:var(--rye);color:#EFE7DA;padding:28px 20px;display:flex;flex-direction:column;gap:20px;}
+  .brand{font-family:'Roboto Slab',serif;font-weight:700;font-size:19px;letter-spacing:0.3px;color:#FBF6EA;}
+  .brand small{display:block;font-family:'Noto Sans TC',sans-serif;font-weight:400;font-size:12px;color:#C9BBA3;margin-top:4px;}
+  .flavor-list{display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;}
+  .flavor-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:6px;cursor:pointer;font-size:14px;border:1px solid transparent;color:#E7DCC7;}
+  .flavor-item:hover{background:rgba(255,255,255,0.06);}
+  .flavor-item.active{background:#4A392C;border-color:#7A6248;color:#FBF6EA;font-weight:500;}
+  .flavor-item .del{opacity:0;color:#D8A9A4;font-size:12px;padding:2px 6px;}
+  .flavor-item:hover .del{opacity:1;}
+  .new-flavor-btn{background:var(--wheat);color:#2B2621;border:none;border-radius:6px;padding:10px 12px;font-size:14px;font-weight:500;cursor:pointer;text-align:left;}
+  .new-flavor-btn:hover{filter:brightness(1.06);}
+  .sidebar-foot{font-size:11px;color:#9C8F76;border-top:1px solid #6E5A46;padding-top:14px;}
+  #sidebar-search::placeholder{color:#B8A98C;}
+  #sidebar-search:focus{outline:none;border-color:var(--wheat);}
+  .main{padding:32px 40px 60px;max-width:1120px;}
+  .top-row{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:8px;}
+  .name-input{font-family:'Roboto Slab',serif;font-weight:700;font-size:26px;border:none;background:transparent;color:var(--ink);padding:2px 0;border-bottom:2px solid transparent;min-width:280px;}
+  .name-input:focus{outline:none;border-bottom:2px solid var(--wheat);}
+  .actions{display:flex;gap:8px;}
+  .btn{border:1px solid var(--rule-strong);background:var(--panel);color:var(--ink);padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;}
+  .btn:hover{border-color:var(--wheat);}
+  .btn.primary{background:var(--wheat);border-color:var(--wheat);color:#2B2621;font-weight:500;}
+  .disclaimer{display:flex;gap:10px;align-items:flex-start;background:var(--stamp-soft);border:1px solid #E3B9B4;border-radius:8px;padding:12px 14px;font-size:12.5px;color:#7A2A25;margin:18px 0 26px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start;}
+  .section-title{font-family:'Roboto Slab',serif;font-weight:500;font-size:13px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.6px;margin:0 0 8px;}
+  .panel{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:12px 14px 14px;margin-bottom:14px;}
+  .item-row{display:grid;grid-template-columns:1fr 60px 76px 24px 24px;gap:5px;align-items:center;margin-bottom:5px;}
+  .item-row input, .item-row select{padding:4px 5px;font-size:11px;}
+  .bake-check{display:flex;align-items:center;justify-content:center;}
+  select, input[type=text], input[type=number], input[type=password], textarea{font-family:'Noto Sans TC',sans-serif;font-size:12px;padding:5px 7px;border:1px solid var(--rule-strong);border-radius:5px;background:#FDFCF9;color:var(--ink);width:100%;}
+  textarea{resize:vertical;min-height:56px;line-height:1.4;}
+  select:focus, input:focus, textarea:focus{outline:none;border-color:var(--wheat);}
+  .row-del{background:none;border:none;color:#B37672;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
+  .add-item-btn{font-size:11.5px;color:var(--wheat);background:none;border:none;cursor:pointer;padding:4px 0 0;font-weight:500;}
+  .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+  .field{margin-bottom:8px;}
+  .field label{display:block;font-size:11px;color:var(--ink-soft);margin-bottom:3px;}
+  .totalrow{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-soft);border-top:1px dashed var(--rule);margin-top:8px;padding-top:7px;}
+  .db-scroll{overflow-x:auto;}
+  .db-row{display:grid;grid-template-columns:100px repeat(8,34px) 42px 24px 20px;gap:4px;align-items:center;margin-bottom:5px;min-width:620px;}
+  .db-row input{padding:4px 4px;font-size:10.5px;}
+  .db-head{display:grid;grid-template-columns:100px repeat(8,34px) 42px 24px 20px;gap:4px;font-size:9px;color:var(--ink-soft);margin-bottom:5px;text-align:center;min-width:620px;}
+  .db-head span:first-child{text-align:left;}
+
+  /* ---------- final printable label ---------- */
+  #label-capture{background:#fff;padding:6px 2px 2px;display:flex;justify-content:center;}
+  .label-card{background:#fff;border:1.5px solid var(--ink);border-radius:6px;padding:8px 11px;display:grid;grid-template-columns:1fr 76px 200px;gap:8px;width:500px;box-sizing:border-box;}
+  .label-left{display:flex;flex-direction:column;}
+  .label-top{margin-bottom:2px;}
+  .label-title{font-family:'Noto Sans TC',sans-serif;font-weight:700;font-size:14px;line-height:1.15;}
+  .label-line{font-size:8.5px;margin:1px 0;}
+  .label-line b{font-weight:700;color:var(--ink);}
+  .label-ingredients{font-size:8.5px;margin:2px 0 7px;line-height:1.25;}
+  .label-bottom-row{display:flex;align-items:center;margin-top:auto;padding-top:3px;}
+  .label-ingredients b{font-weight:700;}
+  .label-center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:4px 6px;}
+  .label-logo{display:block;width:40px;height:40px;object-fit:contain;}
+  .label-qr{display:block;width:52px;height:52px;object-fit:contain;flex-shrink:0;}
+  .qr-framed-box{border:1px solid var(--ink);border-radius:3px;overflow:hidden;display:inline-flex;flex-direction:column;align-items:center;}
+  .qr-framed-caption{background:var(--ink);color:#fff;font-size:6px;font-weight:600;padding:2px 3px;width:100%;text-align:center;box-sizing:border-box;letter-spacing:0.3px;}
+  .qr-framed-body{padding:4px;}
+  .allergy-note{font-size:7px;color:var(--ink-soft);line-height:1.3;margin-top:3px;}
+  .nutri-label{border:1.5px solid var(--ink);padding:5px 8px 6px;font-family:'IBM Plex Mono',monospace;color:var(--ink);}
+  .nutri-label h4{text-align:center;margin:0 0 4px;font-family:'Noto Sans TC',sans-serif;font-weight:700;font-size:10.5px;letter-spacing:1px;border-bottom:1.5px solid var(--ink);padding-bottom:3px;}
+  .nutri-meta{font-size:8px;border-bottom:1px solid var(--ink);padding-bottom:3px;margin-bottom:2px;}
+  .nutri-table{width:100%;border-collapse:collapse;font-size:8.5px;}
+  .nutri-table th{text-align:right;font-weight:600;font-size:7px;padding:2px 0 3px;border-bottom:1px solid var(--ink);}
+  .nutri-table th:first-child{text-align:left;}
+  .nutri-table td{padding:1.5px 0;border-bottom:1px solid var(--rule);text-align:right;}
+  .nutri-table td:first-child{text-align:left;font-family:'Noto Sans TC',sans-serif;}
+  .nutri-table tr.indent td:first-child{padding-left:8px;}
+  .nutri-table tr:last-child td{border-bottom:1px solid var(--ink);}
+  .nutri-foot{font-size:9px;color:var(--ink-soft);margin-top:8px;font-family:'Noto Sans TC',sans-serif;}
+  .flavor-list::-webkit-scrollbar{width:5px;}
+  .flavor-list::-webkit-scrollbar-thumb{background:#7A6248;border-radius:3px;}
+  .empty-state{color:var(--ink-soft);font-size:14px;padding:60px 0;text-align:center;}
+  .db-cost-search:disabled{opacity:0.5;cursor:default;}
+  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  input[type=number]{ -moz-appearance:textfield; }
+  .db-val{display:flex;align-items:center;justify-content:center;height:100%;min-height:18px;font-size:10.5px;cursor:text;border:1px solid transparent;border-radius:3px;padding:3px 1px;color:var(--ink);}
+  .db-val:hover{border-color:var(--rule-strong);background:#FDFCF9;}
+  .db-val-input{width:100%;font-size:10.5px;padding:3px 2px;text-align:center;}
+  .preset-dropdown{position:absolute;left:0;right:0;top:100%;z-index:50;background:#fff;border:1px solid var(--rule-strong);border-radius:6px;margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,0.12);overflow:hidden;}
+  .preset-option{padding:7px 10px;font-size:12px;cursor:pointer;color:var(--ink);}
+  .preset-option:hover{background:var(--wheat-soft);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="brand">貝果配方本</div>
+    <button class="new-flavor-btn" id="new-flavor-btn">+ 新增口味</button>
+    <input type="text" id="sidebar-search" placeholder="🔍 搜尋口味名稱／分類…" style="background:rgba(255,255,255,0.08);border:1px solid #6E5A46;color:#EFE7DA;padding:8px 10px;border-radius:6px;font-size:13px;">
+    <div class="flavor-list" id="flavor-list"></div>
+    <div class="sidebar-foot">所有口味存在你自己的 Supabase 資料庫，換裝置、換瀏覽器都看得到同一份資料。</div>
+  </div>
+  <div class="main" id="main-panel"><div class="empty-state">載入中…</div></div>
+  <div id="qr-gen-hidden" style="position:fixed;left:-9999px;top:0;"></div>
+</div>
+
+<script>
+// ============================================================
+// 資料層：全部走 Supabase，不再使用 window.storage / 直接呼叫 Anthropic API。
+// AI 相關功能（配方解析、原料成本搜尋）都透過 config.js 裡設定的
+// window.AI_PROXY_URL（Supabase Edge Function）代理，API金鑰留在伺服器端。
+// ============================================================
+
+let sb = null;
+let db = null, flavorIndex = null, activeId = null, activeFlavor = null, brand = null;
+let ingredientUsageCount = {};   // ingredientId -> 用在幾款口味裡
+let showOnlyUsedIngredients = false;
+
+async function refreshIngredientUsage(){
+  const {data, error} = await sb.from('flavors').select('items');
+  if(error){ return; }
+  const counts = {};
+  (data||[]).forEach(row=>{
+    const seenInThisFlavor = new Set();
+    (row.items||[]).forEach(it=>{ seenInThisFlavor.add(it.ingredientId); });
+    seenInThisFlavor.forEach(id=>{ counts[id] = (counts[id]||0) + 1; });
+  });
+  ingredientUsageCount = counts;
+}
+
+function uid(){ return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function round(v, decimals){ const f = Math.pow(10,decimals); return Math.round((v + Number.EPSILON) * f) / f; }
+function formatDateShort(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function debounce(fn, wait){
+  let t;
+  return function(...args){
+    clearTimeout(t);
+    t = setTimeout(()=>fn.apply(this,args), wait);
+  };
+}
+
+function alert2(msg){
+  let toast = document.getElementById('app-toast');
+  if(!toast){
+    toast = document.createElement('div');
+    toast.id = 'app-toast';
+    toast.style.cssText = 'position:fixed;bottom:20px;right:20px;max-width:360px;background:#3a2f27;color:#FBF6EA;padding:12px 16px;border-radius:8px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,0.25);z-index:9999;line-height:1.5;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(()=>{ toast.style.display = 'none'; }, 5000);
+}
+
+// 自製建議下拉選單 —— 不用瀏覽器原生 <datalist>，因為各瀏覽器（尤其 Safari）
+// 常常不會實際跳出選單，改成自己畫的清單，保證每台裝置行為一致。
+function attachPresetDropdown(inputId, options, onPick){
+  const input = document.getElementById(inputId);
+  if(!input) return;
+  const field = input.closest('.field');
+  let menu = null;
+  const close = ()=>{ if(menu){ menu.remove(); menu = null; } };
+  const open = ()=>{
+    close();
+    menu = document.createElement('div');
+    menu.className = 'preset-dropdown';
+    options.forEach(opt=>{
+      const item = document.createElement('div');
+      item.className = 'preset-option';
+      item.textContent = opt;
+      item.addEventListener('mousedown', e=>{
+        e.preventDefault();
+        input.value = opt;
+        onPick(opt);
+        close();
+      });
+      menu.appendChild(item);
+    });
+    field.appendChild(menu);
+  };
+  input.addEventListener('focus', open);
+  input.addEventListener('click', open);
+  input.addEventListener('blur', ()=>{ setTimeout(close, 150); });
+}
+
+// 原料搜尋選擇器 —— 原本是把全部2000多項原料塞進一個 <select>，改成搜尋輸入框，
+// 預設（還沒打字時）只列出「常用原料」（有在任何口味用過的），打字才搜全部資料庫。
+function attachIngredientPicker(input, idx){
+  const field = input.closest('div');
+  let menu = null;
+  const close = ()=>{ if(menu){ menu.remove(); menu = null; } };
+  const renderList = (forceEmpty)=>{
+    close();
+    const q = forceEmpty ? '' : input.value.trim().toLowerCase();
+    const currentId = activeFlavor.items[idx]?.ingredientId;
+    let results;
+    if(!q){
+      results = db.filter(d=>(ingredientUsageCount[d.id]||0) > 0)
+        .sort((a,b)=> (ingredientUsageCount[b.id]||0) - (ingredientUsageCount[a.id]||0))
+        .slice(0, 12);
+      if(results.length===0) results = db.slice(0, 12);
+    } else {
+      results = db.filter(d=>d.name.toLowerCase().includes(q))
+        .sort((a,b)=> (ingredientUsageCount[b.id]||0) - (ingredientUsageCount[a.id]||0))
+        .slice(0, 30);
+    }
+    if(results.length===0) return;
+    menu = document.createElement('div');
+    menu.className = 'preset-dropdown';
+    if(!q){
+      const hint = document.createElement('div');
+      hint.style.cssText = 'padding:5px 10px;font-size:9.5px;color:var(--ink-soft);border-bottom:1px solid var(--rule);';
+      hint.textContent = '常用原料（打字可搜尋全部原料庫）';
+      menu.appendChild(hint);
+    }
+    results.forEach(d=>{
+      const item = document.createElement('div');
+      item.className = 'preset-option';
+      const usage = ingredientUsageCount[d.id]||0;
+      item.style.cssText = 'display:flex;justify-content:space-between;gap:6px;';
+      item.innerHTML = `<span>${escapeHtml(d.name)}${d.id===currentId?' ✓':''}</span>${usage>0?`<span style="color:var(--ink-soft);font-size:10.5px;">×${usage}</span>`:''}`;
+      item.addEventListener('mousedown', e=>{
+        e.preventDefault();
+        activeFlavor.items[idx].ingredientId = d.id;
+        input.value = d.name;
+        close();
+        refreshLabel(); refreshCost();
+      });
+      menu.appendChild(item);
+    });
+    field.appendChild(menu);
+  };
+  input.addEventListener('focus', ()=>{ input.select(); renderList(true); });
+  input.addEventListener('input', ()=>renderList(false));
+  input.addEventListener('blur', ()=>{
+    setTimeout(()=>{
+      close();
+      const current = db.find(d=>d.id===activeFlavor.items[idx]?.ingredientId);
+      input.value = current ? current.name : '';
+    }, 150);
+  });
+}
+
+// ---------- row <-> model mapping ----------
+function ingredientRowToModel(row){
+  return {
+    id: row.id, name: row.name,
+    kcal:+row.kcal||0, protein:+row.protein||0, fat:+row.fat||0, satfat:+row.satfat||0,
+    transfat:+row.transfat||0, carb:+row.carb||0, sugar:+row.sugar||0, fiber:+row.fiber||0, sodium:+row.sodium||0,
+    cost: (row.cost===null||row.cost===undefined) ? undefined : +row.cost,
+    costSource: row.cost_source || undefined,
+    costSearchedAt: row.cost_searched_at || undefined,
+    costSourceNote: row.cost_source_note || '',
+    isMeat: !!row.is_meat, origin: row.origin || undefined, needsReview: !!row.needs_review
+  };
+}
+function ingredientModelToRow(ing){
+  return {
+    id: ing.id, name: ing.name,
+    kcal: ing.kcal||0, protein: ing.protein||0, fat: ing.fat||0, satfat: ing.satfat||0, transfat: ing.transfat||0,
+    carb: ing.carb||0, sugar: ing.sugar||0, fiber: ing.fiber||0, sodium: ing.sodium||0,
+    cost: ing.cost===undefined ? null : ing.cost,
+    cost_source: ing.costSource || null,
+    cost_searched_at: ing.costSearchedAt || null,
+    cost_source_note: ing.costSourceNote || null,
+    is_meat: !!ing.isMeat, origin: ing.origin || null, needs_review: !!ing.needsReview,
+    updated_at: new Date().toISOString()
+  };
+}
+function flavorRowToModel(row){
+  return {
+    id: row.id, name: row.name, category: row.category||'', items: row.items||[],
+    servingRaw:+row.serving_raw||0, bakeLoss:+row.bake_loss||0, note: row.note||'',
+    ingredientsText: row.ingredients_text||'', ingredientsFormat: row.ingredients_format||'bracket',
+    netWeight:+row.net_weight||0, netTolerance:+row.net_tolerance||0, packageServings: row.package_servings||1,
+    shelfLife: row.shelf_life||'', manufactureDate: row.manufacture_date||'', expiryDate: row.expiry_date||'',
+    originText: row.origin_text||'', storageMethod: row.storage_method||'', bagCost:+row.bag_cost||0,
+    labelCost:+row.label_cost||0, otherCost:+row.other_cost||0, sellingPrice:+row.selling_price||0,
+    allergyNote: row.allergy_note||'', officialLink: row.official_link||'', sortOrder: row.sort_order||0
+  };
+}
+function flavorModelToRow(f){
+  return {
+    id: f.id, name: f.name, category: f.category||'', sort_order: f.sortOrder||0,
+    items: f.items||[], serving_raw: f.servingRaw||0, bake_loss: f.bakeLoss||0, note: f.note||'',
+    ingredients_text: f.ingredientsText||'', ingredients_format: f.ingredientsFormat||'bracket',
+    net_weight: f.netWeight||0, net_tolerance: f.netTolerance||0, package_servings: f.packageServings||1,
+    shelf_life: f.shelfLife||'', manufacture_date: f.manufactureDate||'', expiry_date: f.expiryDate||'',
+    origin_text: f.originText||'', storage_method: f.storageMethod||'', bag_cost: f.bagCost||0,
+    label_cost: f.labelCost||0, other_cost: f.otherCost||0, selling_price: f.sellingPrice||0,
+    allergy_note: f.allergyNote||'', official_link: f.officialLink||'', updated_at: new Date().toISOString()
+  };
+}
+
+// ---------- Supabase access ----------
+async function dbLoadIngredients(){
+  // Supabase 單次查詢預設最多回傳1000筆，原料庫超過1000筆時要分頁抓完，
+  // 不然排序較後面的原料（包含基礎原料如鹽、糖）會在畫面上憑空消失，
+  // 造成計算結果錯誤但畫面上完全看不出來哪裡少了。
+  const pageSize = 1000;
+  let offset = 0;
+  let all = [];
+  while(true){
+    const {data,error} = await sb.from('ingredients').select('*').order('name').range(offset, offset+pageSize-1);
+    if(error){ alert2('讀取原料庫失敗：'+error.message); return all.map(ingredientRowToModel); }
+    all = all.concat(data);
+    if(data.length < pageSize) break;
+    offset += pageSize;
+  }
+  return all.map(ingredientRowToModel);
+}
+async function dbSaveIngredient(ing){
+  const {error} = await sb.from('ingredients').upsert(ingredientModelToRow(ing));
+  if(error){ alert2('儲存原料「'+ing.name+'」失敗：'+error.message); return false; }
+  return true;
+}
+async function dbDeleteIngredient(id){
+  const {error} = await sb.from('ingredients').delete().eq('id', id);
+  if(error){ alert2('刪除原料失敗：'+error.message); return false; }
+  return true;
+}
+async function dbLoadFlavorIndex(){
+  const {data,error} = await sb.from('flavors').select('id,name,category,sort_order').order('sort_order');
+  if(error){ alert2('讀取口味清單失敗：'+error.message); return []; }
+  return data.map(r=>({id:r.id, name:r.name, category:r.category||'', sortOrder:r.sort_order||0}));
+}
+async function dbLoadFlavor(id){
+  const {data,error} = await sb.from('flavors').select('*').eq('id',id).single();
+  if(error){ alert2('讀取口味失敗：'+error.message); return null; }
+  return flavorRowToModel(data);
+}
+async function dbInsertFlavor(f){
+  const {error} = await sb.from('flavors').insert(flavorModelToRow(f));
+  if(error){ alert2('新增口味失敗：'+error.message); return false; }
+  return true;
+}
+async function dbSaveFlavor(f){
+  const {error} = await sb.from('flavors').update(flavorModelToRow(f)).eq('id', f.id);
+  if(error){ alert2('儲存口味失敗：'+error.message); return false; }
+  return true;
+}
+async function dbDeleteFlavor(id){
+  const {error} = await sb.from('flavors').delete().eq('id', id);
+  if(error){ alert2('刪除口味失敗：'+error.message); return false; }
+  return true;
+}
+async function dbUpdateFlavorCategory(id, category){
+  const {error} = await sb.from('flavors').update({category, updated_at:new Date().toISOString()}).eq('id', id);
+  if(error){ alert2('更新分類失敗：'+error.message); return false; }
+  return true;
+}
+async function persistFlavorIndexOrder(){
+  for(let i=0;i<flavorIndex.length;i++){
+    const {error} = await sb.from('flavors').update({sort_order:i}).eq('id', flavorIndex[i].id);
+    if(error){ alert2('更新排序失敗：'+error.message); return false; }
+  }
+  return true;
+}
+async function dbLoadBrand(){
+  const {data,error} = await sb.from('brand_settings').select('*').eq('id',1).single();
+  if(error){ alert2('讀取品牌設定失敗：'+error.message+'（記得先到 Supabase SQL Editor 執行一次 supabase-schema.sql）'); return null; }
+  return {
+    brandName: data.brand_name||'', contactEmail: data.contact_email||'', igHandle: data.ig_handle||'',
+    generalNotice: data.general_notice||'', logoDataUrl: data.logo_data_url||'', officialLink: data.official_link||'',
+    usageLink: data.usage_link||'', qrCaption: data.qr_caption||'掃描看官網', labelScale: data.label_scale||100,
+    staffPin: data.staff_pin||'8888', qrDataUrl:'', usageQrDataUrl:''
+  };
+}
+async function dbSaveBrand(b){
+  const {error} = await sb.from('brand_settings').update({
+    brand_name: b.brandName||'', contact_email: b.contactEmail||'', ig_handle: b.igHandle||'',
+    general_notice: b.generalNotice||'', logo_data_url: b.logoDataUrl||'', official_link: b.officialLink||'',
+    usage_link: b.usageLink||'', qr_caption: b.qrCaption||'', label_scale: b.labelScale||100,
+    staff_pin: b.staffPin||'8888', updated_at: new Date().toISOString()
+  }).eq('id',1);
+  if(error){ alert2('儲存品牌設定失敗：'+error.message); return false; }
+  return true;
+}
+
+// ---------- AI proxy (Supabase Edge Function) ----------
+async function callAiProxy(action, payload){
+  if(!window.AI_PROXY_URL || window.AI_PROXY_URL.includes('your-project-ref')){
+    throw new Error('config.js 裡的 AI_PROXY_URL 還沒填，AI 功能無法使用');
+  }
+  const res = await fetch(window.AI_PROXY_URL, {
+    method:'POST',
+    headers:{'Content-Type':'application/json', 'x-app-secret': window.APP_SHARED_SECRET||''},
+    body: JSON.stringify({action, ...payload})
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok || data.error){ throw new Error(data.error || ('HTTP '+res.status)); }
+  return data;
+}
+
+const ingredientSaveDebouncers = {};
+function debouncedSaveIngredientRow(ing){
+  if(!ingredientSaveDebouncers[ing.id]){
+    ingredientSaveDebouncers[ing.id] = debounce((i)=>dbSaveIngredient(i), 600);
+  }
+  ingredientSaveDebouncers[ing.id](ing);
+}
+
+// ============================================================
+// PIN 畫面（純介面層阻擋，不是資安機制 — 內部工具用途已足夠）
+// ============================================================
+async function showPinGateIfNeeded(){
+  const KEY='bagel_staff_pin_ok';
+  if(sessionStorage.getItem(KEY)==='1') return true;
+  return new Promise(resolve=>{
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;background:var(--rye);display:flex;align-items:center;justify-content:center;z-index:10000;';
+    overlay.innerHTML=`
+      <div style="background:#fff;padding:28px 26px;border-radius:10px;width:260px;text-align:center;">
+        <div style="font-family:'Roboto Slab',serif;font-weight:700;font-size:16px;margin-bottom:14px;color:var(--ink);">內部工具・請輸入PIN</div>
+        <input id="pin-input" type="password" inputmode="numeric" style="width:100%;text-align:center;font-size:18px;letter-spacing:4px;padding:8px;">
+        <div id="pin-err" style="color:var(--stamp);font-size:12px;min-height:16px;margin:6px 0;"></div>
+        <button id="pin-submit" class="btn primary" style="width:100%;">確認</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const input=overlay.querySelector('#pin-input');
+    const err=overlay.querySelector('#pin-err');
+    input.focus();
+    const submit=()=>{
+      if(input.value === (brand.staffPin||'8888')){
+        sessionStorage.setItem(KEY,'1');
+        document.body.removeChild(overlay);
+        resolve(true);
+      } else {
+        err.textContent='PIN碼不對，再試一次';
+        input.value='';
+        input.focus();
+      }
+    };
+    overlay.querySelector('#pin-submit').addEventListener('click', submit);
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+  });
+}
+
+// ============================================================
+// 初始化
+// ============================================================
+function suggestIngredientsText(flavor){
+  const groups = {};
+  const ungrouped = [];
+  flavor.items.forEach(it=>{
+    const ing = db.find(d=>d.id===it.ingredientId);
+    if(!ing) return;
+    const g = Number(it.grams)||0;
+    const grp = (it.group||'').trim();
+    if(grp){
+      if(!groups[grp]) groups[grp] = {totalGrams:0, items:[]};
+      groups[grp].totalGrams += g;
+      groups[grp].items.push({name: ing.name, grams:g});
+    } else {
+      ungrouped.push({name: ing.name, grams:g});
+    }
+  });
+  const entries = [];
+  const seenUngrouped = new Set();
+  ungrouped.forEach(u=>{
+    if(seenUngrouped.has(u.name)) return;
+    seenUngrouped.add(u.name);
+    const total = ungrouped.filter(x=>x.name===u.name).reduce((s,x)=>s+x.grams,0);
+    entries.push({label:u.name, weight:total});
+  });
+  Object.keys(groups).forEach(gname=>{
+    const grp = groups[gname];
+    const inner = [...grp.items].sort((a,b)=>b.grams-a.grams).map(i=>i.name);
+    const uniqueInner = [...new Set(inner)];
+    entries.push({label: `${gname}（${uniqueInner.join('、')}）`, weight: grp.totalGrams});
+  });
+  entries.sort((a,b)=>b.weight-a.weight);
+  return entries.map(e=>e.label).join('、');
+}
+function suggestIngredientsTextComposition(flavor){
+  const groupOrder = [];
+  const groupItems = {};
+  const ungroupedNames = [];
+  flavor.items.forEach(it=>{
+    const ing = db.find(d=>d.id===it.ingredientId);
+    if(!ing) return;
+    const grp = (it.group||'').trim();
+    if(grp){
+      if(!groupItems[grp]){ groupItems[grp]=[]; groupOrder.push(grp); }
+      groupItems[grp].push(ing.name);
+    } else {
+      ungroupedNames.push(ing.name);
+    }
+  });
+  const compositionLine = groupOrder.length ? ('組成｜' + groupOrder.join('｜') + '｜') : '';
+  const detailParts = [];
+  groupOrder.forEach(g=> detailParts.push(...groupItems[g]));
+  detailParts.push(...ungroupedNames);
+  const detailLine = detailParts.join('、');
+  return compositionLine ? (compositionLine + '\n' + detailLine) : detailLine;
+}
+function suggestIngredientsTextAny(flavor){
+  return flavor.ingredientsFormat === 'composition'
+    ? suggestIngredientsTextComposition(flavor)
+    : suggestIngredientsText(flavor);
+}
+
+const FLOUR_IDS = new Set(['hg_flour','bread_flour','ap_flour','cake_flour','whole_wheat','rye_flour','buckwheat','rice_flour']);
+const WHOLE_GRAIN_IDS = new Set(['whole_wheat','rye_flour','buckwheat']);
+const DAIRY_IDS = new Set(['milk','milk_powder','heavy_cream','cream_cheese','greek_yogurt','cheddar','mozzarella','butter','ghee','coconut_milk','coconut_cream_powder']);
+const EGG_IDS = new Set(['egg_whole','egg_yolk','egg_white']);
+
+function suggestOriginText(flavor){
+  const seen = new Set();
+  const parts = [];
+  (flavor.items||[]).forEach(it=>{
+    const ing = db.find(d=>d.id===it.ingredientId);
+    if(!ing || !ing.origin || seen.has(ing.id)) return;
+    seen.add(ing.id);
+    parts.push(`${ing.name}：${ing.origin}`);
+  });
+  return parts.join('｜');
+}
+
+function hydrateFlavor(flavor){
+  flavor.items = (flavor.items||[]).map(it=>({
+    ingredientId: it.ingredientId, grams: Number(it.grams)||0,
+    group: it.group||'', bakeAffected: it.bakeAffected!==false
+  }));
+  if(flavor.ingredientsFormat===undefined) flavor.ingredientsFormat = 'bracket';
+  if(!flavor.ingredientsText){ flavor.ingredientsText = suggestIngredientsTextAny(flavor); }
+  if(!flavor.netWeight){
+    const calc = calcLabel(flavor);
+    flavor.netWeight = Math.round(calc.servingBaked) || 100;
+  }
+  if(flavor.netTolerance===undefined || flavor.netTolerance===null) flavor.netTolerance = 10;
+  if(flavor.category===undefined) flavor.category = '';
+  if(!flavor.packageServings) flavor.packageServings = 1;
+  if(!flavor.shelfLife) flavor.shelfLife = '2個月';
+  if(!flavor.manufactureDate){
+    const t = new Date();
+    flavor.manufactureDate = `${t.getFullYear()}.${String(t.getMonth()+1).padStart(2,'0')}.${String(t.getDate()).padStart(2,'0')}`;
+  }
+  if(!flavor.originText){ flavor.originText = suggestOriginText(flavor); }
+  if(!flavor.storageMethod) flavor.storageMethod = '冷凍保存';
+  if(!flavor.allergyNote){
+    flavor.allergyNote = '本產品含麩質（小麥）之穀物及其製品，不適合對其過敏體質者食用。';
+  }
+  return flavor;
+}
+
+async function loadFlavor(id){
+  const f = await dbLoadFlavor(id);
+  if(!f) return;
+  activeFlavor = hydrateFlavor(f);
+  activeId = id;
+}
+async function saveActiveFlavor(){
+  const ok = await dbSaveFlavor(activeFlavor);
+  if(ok){
+    const idxItem = flavorIndex.find(f=>f.id===activeId);
+    if(idxItem){ idxItem.name = activeFlavor.name; idxItem.category = activeFlavor.category; }
+  }
+  return ok;
+}
+
+async function init(){
+  if(!window.SUPABASE_URL || window.SUPABASE_URL.includes('your-project-ref')){
+    document.getElementById('main-panel').innerHTML = '<div class="empty-state">請先打開 config.js，填入你自己的 Supabase 連線資訊，然後重新整理這個頁面。</div>';
+    return;
+  }
+  sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+  brand = await dbLoadBrand();
+  if(!brand) return;
+
+  const pinOk = await showPinGateIfNeeded();
+  if(!pinOk) return;
+
+  await regenerateQr();
+  await regenerateUsageQr();
+
+  db = await dbLoadIngredients();
+  flavorIndex = await dbLoadFlavorIndex();
+  await refreshIngredientUsage();
+
+  if(flavorIndex.length === 0){
+    document.getElementById('main-panel').innerHTML = '<div class="empty-state">目前沒有任何口味。按左側「＋ 新增口味」開始，或先去 Supabase SQL Editor 執行一次 supabase-schema.sql 建立範例口味。</div>';
+    renderSidebar();
+    return;
+  }
+  activeId = flavorIndex[0].id;
+  await loadFlavor(activeId);
+  renderSidebar();
+  renderMain();
+}
+
+// ============================================================
+// 側欄
+// ============================================================
+let collapsedCategories = null;
+let sidebarSearchQuery = '';
+function renderSidebar(){
+  const list = document.getElementById('flavor-list');
+  list.innerHTML = '';
+  const q = sidebarSearchQuery.trim().toLowerCase();
+  const categorized = {};
+  const order = [];
+  flavorIndex.forEach(f=>{
+    const cat = (f.category||'').trim() || '未分類';
+    if(q && !f.name.toLowerCase().includes(q) && !cat.toLowerCase().includes(q)) return;
+    if(!categorized[cat]){ categorized[cat] = []; order.push(cat); }
+    categorized[cat].push(f);
+  });
+  if(collapsedCategories === null){
+    collapsedCategories = new Set();
+    flavorIndex.forEach(f=>{ collapsedCategories.add((f.category||'').trim() || '未分類'); });
+  }
+  const activeCat = (flavorIndex.find(f=>f.id===activeId)||{}).category;
+  collapsedCategories.delete((activeCat||'').trim() || '未分類');
+  if(order.length===0){
+    const empty = document.createElement('div');
+    empty.style.cssText = 'color:#B8A98C;font-size:12.5px;padding:16px 4px;text-align:center;';
+    empty.textContent = q ? '找不到符合的口味' : '目前沒有口味';
+    list.appendChild(empty);
+    return;
+  }
+  order.forEach(cat=>{
+    const isCollapsed = q ? false : collapsedCategories.has(cat);
+    const head = document.createElement('div');
+    head.style.cssText = 'font-size:10.5px;color:#B8A98C;text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 4px;padding-left:2px;cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none;';
+    head.innerHTML = `<span style="display:inline-block;transition:transform 0.15s;transform:rotate(${isCollapsed?'-90deg':'0deg'});">▾</span><span>${escapeHtml(cat)}（${categorized[cat].length}）</span>`;
+    head.addEventListener('click', ()=>{
+      if(collapsedCategories.has(cat)) collapsedCategories.delete(cat); else collapsedCategories.add(cat);
+      renderSidebar();
+    });
+    head.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect = 'move'; head.style.background = 'rgba(200,155,63,0.25)'; head.style.borderRadius = '4px'; });
+    head.addEventListener('dragleave', ()=>{ head.style.background = ''; });
+    head.addEventListener('drop', async (e)=>{
+      e.preventDefault();
+      head.style.background = '';
+      const draggedId = e.dataTransfer.getData('text/plain');
+      if(!draggedId) return;
+      const newCat = cat === '未分類' ? '' : cat;
+      const idxItem = flavorIndex.find(x=>x.id===draggedId);
+      if(idxItem) idxItem.category = newCat;
+      const ok = await dbUpdateFlavorCategory(draggedId, newCat);
+      if(ok && draggedId === activeId){ activeFlavor.category = newCat; }
+      collapsedCategories.delete(cat);
+      renderSidebar();
+      if(draggedId === activeId) renderMain();
+    });
+    list.appendChild(head);
+    if(isCollapsed) return;
+    categorized[cat].forEach(f=>{
+      const div = document.createElement('div');
+      div.className = 'flavor-item' + (f.id===activeId ? ' active':'');
+      div.draggable = true;
+      div.dataset.id = f.id;
+      div.innerHTML = `<span>${escapeHtml(f.name)}</span><span class="del" data-id="${f.id}">✕</span>`;
+      div.addEventListener('click', async (e)=>{
+        if(e.target.classList.contains('del')) return;
+        await loadFlavor(f.id); renderSidebar(); renderMain();
+      });
+      div.querySelector('.del').addEventListener('click', async (e)=>{
+        e.stopPropagation();
+        if(flavorIndex.length===1){ alert2('至少保留一個口味，不能刪除最後一個。'); return; }
+        const delBtn = e.target;
+        if(delBtn.dataset.confirming!=='1'){
+          delBtn.dataset.confirming = '1';
+          delBtn.textContent = '確定?';
+          setTimeout(()=>{ delBtn.dataset.confirming=''; delBtn.textContent='✕'; }, 3000);
+          return;
+        }
+        const ok = await dbDeleteFlavor(f.id);
+        if(!ok) return;
+        flavorIndex = flavorIndex.filter(x=>x.id!==f.id);
+        if(activeId===f.id){
+          activeId = flavorIndex[0].id;
+          await loadFlavor(activeId);
+        }
+        await refreshIngredientUsage();
+        renderSidebar();
+        renderMain();
+      });
+      div.addEventListener('dragstart', (e)=>{
+        div.style.opacity = '0.4';
+        e.dataTransfer.setData('text/plain', f.id);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      div.addEventListener('dragend', ()=>{ div.style.opacity = '1'; });
+      div.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect = 'move'; div.style.borderColor = 'var(--wheat)'; });
+      div.addEventListener('dragleave', ()=>{ div.style.borderColor = 'transparent'; });
+      div.addEventListener('drop', async (e)=>{
+        e.preventDefault();
+        div.style.borderColor = 'transparent';
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if(!draggedId || draggedId===f.id) return;
+        const fromIdx = flavorIndex.findIndex(x=>x.id===draggedId);
+        const toIdx = flavorIndex.findIndex(x=>x.id===f.id);
+        if(fromIdx===-1 || toIdx===-1) return;
+        const [moved] = flavorIndex.splice(fromIdx,1);
+        moved.category = f.category || moved.category;
+        flavorIndex.splice(toIdx,0,moved);
+        await persistFlavorIndexOrder();
+        renderSidebar();
+      });
+      list.appendChild(div);
+    });
+  });
+}
+
+document.getElementById('new-flavor-btn').addEventListener('click', async ()=>{
+  const id = uid();
+  const fresh = hydrateFlavor({
+    id, name:'新口味', items:[], servingRaw:100, bakeLoss:10, note:'',
+    ingredientsText:'', netWeight:100, netTolerance:10, shelfLife:'', storageMethod:'冷凍保存',
+    allergyNote:'', packageServings:1, category:'', sortOrder: flavorIndex ? flavorIndex.length : 0
+  });
+  const ok = await dbInsertFlavor(fresh);
+  if(!ok) return;
+  flavorIndex.push({id, name:fresh.name, category:fresh.category, sortOrder:fresh.sortOrder});
+  activeId = id; activeFlavor = fresh;
+  renderSidebar(); renderMain();
+});
+
+document.getElementById('sidebar-search').addEventListener('input', e=>{
+  sidebarSearchQuery = e.target.value;
+  renderSidebar();
+});
+
+// ============================================================
+// 計算邏輯（配方換算、成本、飲食標籤、健康評級）
+// ============================================================
+function calcLabel(flavor){
+  const keys = ['kcal','protein','fat','satfat','transfat','carb','sugar','fiber','sodium'];
+  const totals = {}; keys.forEach(k=>totals[k]=0);
+  let totalRaw = 0, totalBakeAffectedRaw = 0;
+  flavor.items.forEach(it=>{
+    const ing = db.find(d=>d.id===it.ingredientId);
+    if(!ing) return;
+    const g = Number(it.grams)||0;
+    totalRaw += g;
+    if(it.bakeAffected!==false) totalBakeAffectedRaw += g;
+    keys.forEach(k=>{ totals[k] += g/100 * (Number(ing[k])||0); });
+  });
+  const loss = Math.max(0, Math.min(90, Number(flavor.bakeLoss)||0))/100;
+  const totalOtherRaw = totalRaw - totalBakeAffectedRaw;
+  const totalBaked = totalBakeAffectedRaw*(1-loss) + totalOtherRaw;
+  const shrinkRatio = totalRaw>0 ? (totalBaked/totalRaw) : 1;
+  const per100Baked = {};
+  keys.forEach(k=> per100Baked[k] = totalBaked>0 ? totals[k]/totalBaked*100 : 0);
+  const servingRaw = Number(flavor.servingRaw)||0;
+  const servingBaked = servingRaw * shrinkRatio;
+  const perServing = {};
+  keys.forEach(k=> perServing[k] = per100Baked[k] * servingBaked/100);
+  return {totalRaw, totalBaked, servingBaked, per100Baked, perServing};
+}
+
+function calcCost(flavor){
+  let ingredientCostTotal = 0;
+  let totalRaw = 0;
+  const uniqueIngredientIds = new Set();
+  let baselineMetCount = 0, actualCount = 0;
+  flavor.items.forEach(it=>{
+    const ing = db.find(d=>d.id===it.ingredientId);
+    if(!ing) return;
+    const g = Number(it.grams)||0;
+    totalRaw += g;
+    const costPer100 = Number(ing.cost);
+    ingredientCostTotal += g/100 * (costPer100||0);
+    if(!uniqueIngredientIds.has(ing.id)){
+      uniqueIngredientIds.add(ing.id);
+      if(ing.costSource==='ai' || ing.costSource==='actual') baselineMetCount++;
+      if(ing.costSource==='actual') actualCount++;
+    }
+  });
+  const totalUniqueIngredients = uniqueIngredientIds.size;
+  // items 可能是「一份」也可能是「整批」的克重，用 servingRaw/totalRaw 的比例統一換算成
+  // 一份的成本 —— 成本不受烘焙損耗影響，跟營養計算不同，這裡不用再乘烤損比例。
+  const servingRaw = Number(flavor.servingRaw)||0;
+  const scaleRatio = totalRaw>0 ? servingRaw/totalRaw : 1;
+  const ingredientCost = ingredientCostTotal * scaleRatio;
+  const bagCost = Number(flavor.bagCost)||0;
+  const labelCost = Number(flavor.labelCost)||0;
+  const otherCost = Number(flavor.otherCost)||0;
+  const packagingCost = bagCost + labelCost + otherCost;
+  const cogs = ingredientCost + packagingCost;
+  const sellingPrice = Number(flavor.sellingPrice)||0;
+  const marginAtPrice = sellingPrice>0 ? (sellingPrice - cogs)/sellingPrice*100 : null;
+  const marginTargets = [55,60,65,70,80].map(pct=>({
+    pct, suggestedPrice: cogs>0 ? Math.ceil(cogs/(1-pct/100)) : 0
+  }));
+  return {ingredientCost, packagingCost, cogs, marginAtPrice, marginTargets,
+    baselineMetCount, actualCount, totalUniqueIngredients};
+}
+function fmt(val, type){ if(type==='int') return String(Math.round(val)); return round(val,1).toFixed(1); }
+
+function calcDietTag(flavor){
+  let hasMeat=false, hasDairy=false, hasEgg=false;
+  (flavor.items||[]).forEach(it=>{
+    const ing = db.find(d=>d.id===it.ingredientId);
+    if(!ing) return;
+    if(ing.isMeat) hasMeat = true;
+    if(DAIRY_IDS.has(it.ingredientId)) hasDairy = true;
+    if(EGG_IDS.has(it.ingredientId)) hasEgg = true;
+  });
+  if(hasMeat) return {label:'葷食', color:'#B0413E'};
+  if(hasDairy && hasEgg) return {label:'蛋奶素', color:'#8A7A3C'};
+  if(hasDairy && !hasEgg) return {label:'奶素', color:'#5B8A3C'};
+  if(!hasDairy && hasEgg) return {label:'蛋素', color:'#8A7A3C'};
+  return {label:'全素', color:'#1B7A3D'};
+}
+function dietTagHtml(flavor){
+  const tag = calcDietTag(flavor);
+  return `<span style="display:inline-block;border:1.5px solid ${tag.color};color:${tag.color};font-weight:700;font-size:9px;padding:1px 6px;border-radius:3px;">${tag.label}</span>`;
+}
+
+function calcWholeGrainRatio(flavor){
+  let wholeGrainGrams = 0, totalFlourGrams = 0;
+  (flavor.items||[]).forEach(it=>{
+    if(FLOUR_IDS.has(it.ingredientId)){
+      const g = Number(it.grams)||0;
+      totalFlourGrams += g;
+      if(WHOLE_GRAIN_IDS.has(it.ingredientId)) wholeGrainGrams += g;
+    }
+  });
+  return totalFlourGrams>0 ? wholeGrainGrams/totalFlourGrams : 0;
+}
+
+// ------------------------------------------------------------
+// 健康評級：改用固定門檻的簡化版 Nutri-Score，不再跟你目前庫裡
+// 有幾款口味、彼此分數怎麼分布有關 —— 同一款口味的評級不會因為
+// 你新增/刪除其他口味而改變，門檻本身也有公開依據可以參考。
+// 限制：官方 Nutri-Score 還會計入蔬果/堅果/豆類比例，這裡沒有
+// 追蹤這項資料，所以是簡化版，僅供內部參考、不是官方認證分數。
+// ------------------------------------------------------------
+const NUTRISCORE_ENERGY_KJ = [335,670,1005,1340,1675,2010,2345,2680,3015,3350];
+const NUTRISCORE_SUGAR_G   = [4.5,9,13.5,18,22.5,27,31,36,40,45];
+const NUTRISCORE_SATFAT_G  = [1,2,3,4,5,6,7,8,9,10];
+const NUTRISCORE_SODIUM_MG = [90,180,270,360,450,540,630,720,810,900];
+const NUTRISCORE_FIBER_G   = [0.9,1.9,2.8,3.7,4.7];
+const NUTRISCORE_PROTEIN_G = [1.6,3.2,4.8,6.4,8.0];
+
+function bandPoints(value, thresholds){
+  for(let i=0;i<thresholds.length;i++){ if(value<=thresholds[i]) return i; }
+  return thresholds.length;
+}
+
+function calcNutriScore(per100g){
+  const energyKJ = (per100g.kcal||0) * 4.184;
+  const negative =
+    bandPoints(energyKJ, NUTRISCORE_ENERGY_KJ) +
+    bandPoints(per100g.sugar||0, NUTRISCORE_SUGAR_G) +
+    bandPoints(per100g.satfat||0, NUTRISCORE_SATFAT_G) +
+    bandPoints(per100g.sodium||0, NUTRISCORE_SODIUM_MG);
+  let fiberPts = bandPoints(per100g.fiber||0, NUTRISCORE_FIBER_G);
+  let proteinPts = bandPoints(per100g.protein||0, NUTRISCORE_PROTEIN_G);
+  // 官方規則：負分>=11時，蛋白質加分要蔬果比例>80%才能算，這裡沒追蹤蔬果比例，保守設為0
+  if(negative >= 11 && proteinPts > 0){ proteinPts = 0; }
+  const positive = fiberPts + proteinPts;
+  const score = negative - positive;
+  let grade;
+  if(score <= -1) grade = 'A';
+  else if(score <= 2) grade = 'B';
+  else if(score <= 10) grade = 'C';
+  else if(score <= 18) grade = 'D';
+  else grade = 'E';
+  return {score, grade, negative, positive, fiberPts, proteinPts};
+}
+
+function healthGradeHtml(flavor, per100g){
+  const ns = calcNutriScore(per100g);
+  const wholeGrainRatio = calcWholeGrainRatio(flavor);
+  const letters = ['A','B','C','D','E'];
+  const colors = {A:'#1B7A3D', B:'#84BD3C', C:'#F5C623', D:'#F0932B', E:'#D9432E'};
+  return `
+    <div style="margin-top:3px;">
+      <div style="display:flex;gap:1px;">
+        ${letters.map(l=>`<div style="flex:1;text-align:center;font-family:'Noto Sans TC',sans-serif;font-weight:700;
+          background:${colors[l]};color:#fff;
+          font-size:${l===ns.grade?'9px':'6.5px'};
+          padding:${l===ns.grade?'2px 0':'1.5px 0'};
+          opacity:${l===ns.grade?'1':'0.35'};
+          transform:${l===ns.grade?'scale(1.1)':'scale(1)'};
+          border-radius:2px;">${l}</div>`).join('')}
+      </div>
+      <div style="font-size:6px;color:var(--ink-soft);margin-top:2px;text-align:center;">簡化版 Nutri-Score（未計入蔬果堅果比例），僅供內部參考${wholeGrainRatio>0?`｜全穀比例 ${Math.round(wholeGrainRatio*100)}%`:''}</div>
+    </div>`;
+}
+
+function nutriTableHtml(flavor, calc){
+  const p = calc.perServing, h = calc.per100Baked;
+  const transZero = (h.fat<=1 && p.fat<=1) || (h.transfat<=0.3 && p.transfat<=0.3);
+  const rows = [
+    ['熱量','大卡', fmt(p.kcal,'int'), fmt(h.kcal,'int')],
+    ['蛋白質','公克', fmt(p.protein,'dec1'), fmt(h.protein,'dec1')],
+    ['脂肪','公克', fmt(p.fat,'dec1'), fmt(h.fat,'dec1')],
+    ['　飽和脂肪','公克', fmt(p.satfat,'dec1'), fmt(h.satfat,'dec1')],
+    ['　反式脂肪','公克', transZero? '0' : fmt(p.transfat,'dec1'), transZero? '0' : fmt(h.transfat,'dec1')],
+    ['碳水化合物','公克', fmt(p.carb,'dec1'), fmt(h.carb,'dec1')],
+    ['　糖','公克', fmt(p.sugar,'dec1'), fmt(h.sugar,'dec1')],
+    ['鈉','毫克', fmt(p.sodium,'int'), fmt(h.sodium,'int')],
+  ];
+  return `
+    <div class="nutri-label">
+      <h4>營養標示</h4>
+      <div class="nutri-meta">每一份量 ${round(calc.servingBaked,1)} 公克&nbsp;&nbsp;本包裝含 ${flavor.packageServings||1} 份</div>
+      <table class="nutri-table">
+        <tr><th>　</th><th>每份</th><th>每100公克</th></tr>
+        ${rows.map(r=>`<tr class="${r[0].startsWith('　')?'indent':''}"><td>${r[0]}</td><td>${r[2]} ${r[1]}</td><td>${r[3]} ${r[1]}</td></tr>`).join('')}
+      </table>
+    </div>`;
+}
+
+function renderIngredientsBlock(flavor){
+  const text = flavor.ingredientsText || '';
+  if(flavor.ingredientsFormat === 'composition' && text.includes('\n')){
+    const [compLine, ...rest] = text.split('\n');
+    const detail = rest.join(' ').trim();
+    return `<div class="label-ingredients" style="font-weight:700;">${escapeHtml(compLine)}</div><div class="label-ingredients"><b>成份：</b>${escapeHtml(detail)}</div>`;
+  }
+  return `<div class="label-ingredients"><b>成份：</b>${escapeHtml(text)}</div>`;
+}
+
+function fullLabelHtml(flavor, calc){
+  const logoImg = brand.logoDataUrl ? `<img class="label-logo" src="${brand.logoDataUrl}" alt="logo">` : '';
+  const qrFramed = brand.qrDataUrl ? `<div class="qr-framed-box">${brand.qrCaption?`<div class="qr-framed-caption">${escapeHtml(brand.qrCaption)}</div>`:''}<div class="qr-framed-body"><img class="label-qr" src="${brand.qrDataUrl}" alt="qr"></div></div>` : '';
+  const usageQrFramed = brand.usageQrDataUrl ? `<div class="qr-framed-box"><div class="qr-framed-caption">掃描看食用方式</div><div class="qr-framed-body"><img class="label-qr" src="${brand.usageQrDataUrl}" alt="usage qr"></div></div>` : '';
+  const scale = (brand.labelScale || 100) / 100;
+
+  return `
+    <div style="transform:scale(${scale});transform-origin:top center;">
+    <div class="label-card">
+      <div class="label-left">
+        <div class="label-top">
+          <div class="label-title" style="display:flex;align-items:center;gap:6px;">${escapeHtml(flavor.name)} ${dietTagHtml(flavor)}</div>
+        </div>
+        ${renderIngredientsBlock(flavor)}
+        <div class="label-line"><b>內容量：</b>${flavor.netWeight||0}${flavor.netTolerance?('±'+flavor.netTolerance):''}克</div>
+        <div class="label-line"><b>保存期限：</b>${escapeHtml(flavor.shelfLife||'')}</div>
+        <div class="label-line"><b>製造日期：</b>${escapeHtml(flavor.manufactureDate||'')}</div>
+        <div class="label-line"><b>有效日期：</b>${escapeHtml(flavor.expiryDate||'')}</div>
+        <div class="label-line"><b>保存方式：</b>${escapeHtml(flavor.storageMethod||'')}</div>
+        ${flavor.originText ? `<div class="label-line"><b>產地：</b>${escapeHtml(flavor.originText)}</div>` : ''}
+        <div class="label-line"><b>製造商：</b>${escapeHtml(brand.brandName||'')}</div>
+        <div class="label-line"><b>聯絡信箱：</b>${escapeHtml(brand.contactEmail||'')}</div>
+        <div class="label-line"><b>IG：</b>${escapeHtml(brand.igHandle||'')}</div>
+        ${logoImg ? `<div class="label-bottom-row">${logoImg}</div>` : ''}
+        <div class="allergy-note">${[escapeHtml(flavor.allergyNote||''), brand.generalNotice?escapeHtml(brand.generalNotice):''].filter(Boolean).join(' ')}</div>
+      </div>
+      <div class="label-center">
+        ${qrFramed}${usageQrFramed ? `<div style="margin-top:6px;">${usageQrFramed}</div>` : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:center;height:100%;">
+        ${nutriTableHtml(flavor, calc)}
+        ${healthGradeHtml(flavor, calc.per100Baked)}
+      </div>
+    </div>
+    </div>`;
+}
+
+// ============================================================
+// 主畫面
+// ============================================================
+function renderMain(){
+  const main = document.getElementById('main-panel');
+  const calc = calcLabel(activeFlavor);
+  const cost = calcCost(activeFlavor);
+  main.innerHTML = `
+    <div class="top-row">
+      <input class="name-input" id="flavor-name" value="${escapeHtml(activeFlavor.name)}">
+      <div class="actions">
+        <button class="btn" id="duplicate-btn">複製此口味</button>
+        <button class="btn" id="batch-download-btn">批次JPG</button>
+        <button class="btn" id="batch-pdf-btn">批次PDF</button>
+        <button class="btn" id="download-jpg-btn">下載 JPG</button>
+        <button class="btn primary" id="save-btn">儲存</button>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <div class="section-title">匯入配方（貼上文字，AI 自動解析，可一次貼多款口味）</div>
+        <div class="panel">
+          <textarea id="import-text" placeholder="把配方文字貼在這裡，可以包含多款口味、多層酵種（母種／酸液種／老麵等）。" style="min-height:120px;"></textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
+            <button class="btn primary" id="parse-import-btn">AI 解析並加入口味</button>
+            <span id="import-status" style="font-size:12px;color:var(--ink-soft);"></span>
+          </div>
+        </div>
+
+        <div class="section-title">配方原料（已拆解完成的最終克重）</div>
+        <div class="panel">
+          <div id="item-rows"></div>
+          <button class="add-item-btn" id="add-item-btn">＋ 新增原料</button>
+          <div class="totalrow"><span>生麵團總重</span><span id="total-raw-display">${round(calc.totalRaw,1)} 公克</span></div>
+        </div>
+
+        <div class="section-title">份量與烘焙設定</div>
+        <div class="panel">
+          <div class="meta-grid">
+            <div class="field"><label>每份生重（公克）</label><input type="number" id="serving-raw" value="${activeFlavor.servingRaw}" step="0.1"></div>
+            <div class="field"><label>烘焙損耗（%，只套用在有勾「烤損」的原料）</label><input type="number" id="bake-loss" value="${activeFlavor.bakeLoss}" step="0.5"></div>
+          </div>
+          <div class="field"><label>分類（例如：日期批次、主題、口味系列）</label>
+            <select id="flavor-category-select">
+              ${[...new Set(flavorIndex.map(f=>(f.category||'').trim()).filter(Boolean))].map(c=>`<option value="${escapeHtml(c)}" ${activeFlavor.category===c?'selected':''}>${escapeHtml(c)}</option>`).join('')}
+              <option value="" ${!activeFlavor.category?'selected':''}>未分類</option>
+              <option value="__new__">＋ 新增分類…</option>
+            </select>
+            <input type="text" id="flavor-category-new" placeholder="輸入新分類名稱" style="display:none;margin-top:6px;">
+          </div>
+          <div class="field"><label>本包裝含幾份（通常單顆賣＝1）</label><input type="number" id="package-servings" value="${activeFlavor.packageServings||1}" step="1" min="1"></div>
+          <div class="field"><label>內部備註</label><input type="text" id="note" value="${escapeHtml(activeFlavor.note||'')}"></div>
+        </div>
+
+        <div class="section-title" style="margin-bottom:4px;">成本試算（內部用，不會印在標示上）</div>
+        <div class="panel" style="background:#FBF6EA;border-color:var(--wheat);padding:8px 10px;font-size:11px;">
+          <div id="cost-missing-warning">${cost.baselineMetCount < cost.totalUniqueIngredients ? `<div style="font-size:9.5px;color:var(--stamp);margin-bottom:4px;">⚠ 成本涵蓋率 ${cost.baselineMetCount}/${cost.totalUniqueIngredients}，還有原料沒查過成本</div>` : `<div style="font-size:9.5px;color:var(--ok);margin-bottom:4px;">✓ 成本涵蓋率 ${cost.totalUniqueIngredients}/${cost.totalUniqueIngredients}${cost.actualCount?`（其中${cost.actualCount}項是你確認過的實際進貨價）`:''}</div>`}</div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>原料成本</span><span id="ingredient-cost-display">NT$ ${cost.ingredientCost.toFixed(1)}</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin:3px 0;">
+            <div><label style="display:block;font-size:9px;color:var(--ink-soft);">真空袋</label><input type="number" id="bag-cost" value="${activeFlavor.bagCost}" step="0.5" style="padding:3px 4px;font-size:10.5px;"></div>
+            <div><label style="display:block;font-size:9px;color:var(--ink-soft);">標籤貼紙</label><input type="number" id="label-cost" value="${activeFlavor.labelCost}" step="0.5" style="padding:3px 4px;font-size:10.5px;"></div>
+            <div><label style="display:block;font-size:9px;color:var(--ink-soft);">人工/雜項</label><input type="number" id="other-cost" value="${activeFlavor.otherCost}" step="1" style="padding:3px 4px;font-size:10.5px;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-weight:700;margin:5px 0 3px;border-top:1px dashed var(--rule);padding-top:5px;"><span>COGS總成本</span><span id="cogs-display">NT$ ${cost.cogs.toFixed(1)}</span></div>
+          <div style="display:flex;align-items:center;gap:5px;margin-top:5px;">
+            <label style="font-size:9px;color:var(--ink-soft);white-space:nowrap;">目前售價</label>
+            <input type="number" id="selling-price" value="${activeFlavor.sellingPrice||''}" step="1" placeholder="選填" style="padding:3px 4px;font-size:10.5px;flex:1;">
+            <span id="margin-current-display" style="font-size:10px;white-space:nowrap;">${cost.marginAtPrice!==null ? `毛利 <b>${cost.marginAtPrice.toFixed(1)}%</b>` : ''}</span>
+          </div>
+          <div style="font-size:9px;color:var(--ink-soft);margin:5px 0 2px;">目標毛利建議售價：</div>
+          <div id="margin-table-body" style="display:grid;grid-template-columns:repeat(5,1fr);gap:3px;text-align:center;">
+            ${cost.marginTargets.map(t=>`<div style="background:#fff;border:1px solid var(--rule);border-radius:4px;padding:2px 1px;"><div style="font-size:8.5px;color:var(--ink-soft);">${t.pct}%</div><div style="font-size:10px;font-weight:600;">$${t.suggestedPrice}</div></div>`).join('')}
+          </div>
+        </div>
+
+        <div class="section-title">原料營養資料庫（每100公克，數字欄位點兩下修改，點🔍可用AI搜尋市價）</div>
+        <div class="panel">
+          <div id="ingredient-coverage-summary" style="font-size:11px;margin-bottom:8px;"></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+            <input type="text" id="db-search" placeholder="🔍 搜尋原料名稱…" style="flex:1;min-width:160px;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--ink-soft);white-space:nowrap;">
+              <input type="checkbox" id="db-only-used-toggle">只顯示常用原料
+            </label>
+          </div>
+          <div class="db-scroll">
+            <div class="db-head"><span>原料</span><span>熱量</span><span>蛋白</span><span>脂肪</span><span>飽和</span><span>反式</span><span>碳水</span><span>糖</span><span>纖維</span><span>成本</span><span></span><span></span></div>
+            <div id="db-rows" style="max-height:340px;overflow-y:auto;"></div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+            <button class="add-item-btn" id="add-db-btn">＋ 新增原料至資料庫</button>
+            <button class="add-item-btn" id="ai-cost-search-btn" style="color:var(--ok);">🔍 AI批次搜尋成本（只查未驗證）</button>
+            <button class="add-item-btn" id="ai-cost-search-force-btn" style="font-size:11px;">全部重查</button>
+            <span id="cost-search-status" style="font-size:11px;color:var(--ink-soft);"></span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">標示內容</div>
+        <div class="panel">
+          <div class="field"><label>成份 <button type="button" id="regen-ingredients-btn" style="border:none;background:none;color:var(--wheat);cursor:pointer;font-size:11px;text-decoration:underline;">重新產生建議</button> <button type="button" id="toggle-format-btn" style="border:none;background:none;color:var(--ink-soft);cursor:pointer;font-size:11px;text-decoration:underline;">切換格式（目前：${activeFlavor.ingredientsFormat==='composition'?'組成＋細項':'括號分類'}）</button></label><textarea id="ingredientsText" style="min-height:80px;">${escapeHtml(activeFlavor.ingredientsText||'')}</textarea></div>
+          <div class="meta-grid">
+            <div class="field"><label>內容量（克）</label><input type="number" id="netWeight" value="${activeFlavor.netWeight||0}"></div>
+            <div class="field"><label>公差 ±（克）</label><input type="number" id="netTolerance" value="${activeFlavor.netTolerance||0}"></div>
+          </div>
+          <div class="field" style="position:relative;"><label>保存期限</label><input type="text" id="shelfLife" autocomplete="off" value="${escapeHtml(activeFlavor.shelfLife||'')}"></div>
+          <div class="field"><label>製造日期</label><input type="text" id="manufactureDate" value="${escapeHtml(activeFlavor.manufactureDate||'')}" placeholder="例如 2026.08.15"></div>
+          <div class="field" style="position:relative;"><label>有效日期 <button type="button" id="calc-expiry-btn" style="border:none;background:none;color:var(--wheat);cursor:pointer;font-size:10.5px;text-decoration:underline;">用製造日期+保存期限自動算</button></label><input type="text" id="expiryDate" autocomplete="off" value="${escapeHtml(activeFlavor.expiryDate||'')}" placeholder="例如 2026.10.15"></div>
+          <div class="field"><label>產地 <button type="button" id="regen-origin-btn" style="border:none;background:none;color:var(--wheat);cursor:pointer;font-size:10.5px;text-decoration:underline;">依原料自動判斷</button></label><input type="text" id="originText" value="${escapeHtml(activeFlavor.originText||'')}" placeholder="例如 豬肉：台灣"></div>
+          <div class="field" style="position:relative;"><label>保存方式</label><input type="text" id="storageMethod" autocomplete="off" value="${escapeHtml(activeFlavor.storageMethod||'')}"></div>
+          <div class="field"><label>過敏原標示</label><textarea id="allergyNote">${escapeHtml(activeFlavor.allergyNote||'')}</textarea></div>
+        </div>
+
+        <div class="section-title">品牌設定（所有口味共用）</div>
+        <div class="panel">
+          <div class="field"><label>品牌／工作室名稱</label><input type="text" id="brandName" value="${escapeHtml(brand.brandName||'')}"></div>
+          <div class="meta-grid">
+            <div class="field"><label>聯絡信箱</label><input type="text" id="contactEmail" value="${escapeHtml(brand.contactEmail||'')}"></div>
+            <div class="field"><label>IG 帳號</label><input type="text" id="igHandle" value="${escapeHtml(brand.igHandle||'')}"></div>
+          </div>
+          <div class="field"><label>額外提醒（所有口味都會顯示，例如蜂蜜提醒）</label><input type="text" id="generalNotice" value="${escapeHtml(brand.generalNotice||'')}"></div>
+          <div class="field"><label>內部PIN碼（進入本畫面要輸入的密碼）</label><input type="text" id="staffPin" value="${escapeHtml(brand.staffPin||'8888')}"></div>
+          <div class="field">
+            <label>Logo圖片</label>
+            <input type="file" id="logo-upload" accept="image/*">
+            ${brand.logoDataUrl ? `<div style="margin-top:8px;display:flex;align-items:center;gap:10px;"><img src="${brand.logoDataUrl}" style="max-height:40px;max-width:120px;object-fit:contain;border:1px solid var(--rule);padding:4px;background:#fff;"><button type="button" id="remove-logo-btn" class="btn" style="padding:4px 10px;font-size:11px;">移除</button></div>` : ''}
+          </div>
+          <div class="field"><label>官網／領取連結（會自動生成 QR Code）</label>
+            <input type="text" id="official-link" placeholder="https://..." value="${escapeHtml(brand.officialLink||'')}">
+            <input type="text" id="qr-caption" placeholder="QR Code下方要顯示的文字，例如「掃描看官網」" value="${escapeHtml(brand.qrCaption||'')}" style="margin-top:6px;">
+            <div id="qr-preview" style="margin-top:8px;">${brand.qrDataUrl ? `<img src="${brand.qrDataUrl}" style="width:60px;height:60px;border:1px solid var(--rule);padding:4px;background:#fff;">` : ''}</div>
+          </div>
+          <div class="field"><label>食用方式連結（所有口味共用，例如Google文件）</label>
+            <input type="text" id="usage-link" placeholder="https://docs.google.com/..." value="${escapeHtml(brand.usageLink||'')}">
+            <div id="usage-qr-preview" style="margin-top:8px;">${brand.usageQrDataUrl ? `<img src="${brand.usageQrDataUrl}" style="width:60px;height:60px;border:1px solid var(--rule);padding:4px;background:#fff;">` : ''}</div>
+          </div>
+          <div class="field"><label>標籤縮放（${brand.labelScale||100}%）</label>
+            <input type="range" id="label-scale" min="60" max="150" step="5" value="${brand.labelScale||100}">
+          </div>
+        </div>
+
+        <div class="section-title">標示預覽</div>
+        <div id="label-capture">${fullLabelHtml(activeFlavor, calc)}</div>
+      </div>
+    </div>
+  `;
+
+  renderItemRows(); renderDbRows();
+
+  document.getElementById('flavor-name').addEventListener('input', e=>{ activeFlavor.name = e.target.value; refreshLabel(); });
+  document.getElementById('serving-raw').addEventListener('input', e=>{ activeFlavor.servingRaw = Number(e.target.value)||0; refreshLabel(); });
+  document.getElementById('bake-loss').addEventListener('input', e=>{ activeFlavor.bakeLoss = Number(e.target.value)||0; refreshLabel(); });
+  document.getElementById('package-servings').addEventListener('input', e=>{ activeFlavor.packageServings = Number(e.target.value)||1; refreshLabel(); });
+  document.getElementById('flavor-category-select').addEventListener('change', async e=>{
+    const val = e.target.value;
+    const newInput = document.getElementById('flavor-category-new');
+    if(val === '__new__'){ newInput.style.display = 'block'; newInput.focus(); return; }
+    newInput.style.display = 'none';
+    activeFlavor.category = val;
+    const idxItem = flavorIndex.find(f=>f.id===activeId);
+    if(idxItem) idxItem.category = val;
+    await dbUpdateFlavorCategory(activeId, val);
+    renderSidebar();
+  });
+  document.getElementById('flavor-category-new').addEventListener('change', async e=>{
+    const val = e.target.value.trim();
+    if(!val) return;
+    activeFlavor.category = val;
+    const idxItem = flavorIndex.find(f=>f.id===activeId);
+    if(idxItem) idxItem.category = val;
+    await dbUpdateFlavorCategory(activeId, val);
+    renderMain();
+    renderSidebar();
+  });
+  document.getElementById('note').addEventListener('input', e=>{ activeFlavor.note = e.target.value; });
+  document.getElementById('bag-cost').addEventListener('input', e=>{ activeFlavor.bagCost = Number(e.target.value)||0; refreshCost(); });
+  document.getElementById('label-cost').addEventListener('input', e=>{ activeFlavor.labelCost = Number(e.target.value)||0; refreshCost(); });
+  document.getElementById('other-cost').addEventListener('input', e=>{ activeFlavor.otherCost = Number(e.target.value)||0; refreshCost(); });
+  document.getElementById('selling-price').addEventListener('input', e=>{ activeFlavor.sellingPrice = Number(e.target.value)||0; refreshCost(); });
+  document.getElementById('ingredientsText').addEventListener('input', e=>{ activeFlavor.ingredientsText = e.target.value; refreshLabel(); });
+  document.getElementById('regen-ingredients-btn').addEventListener('click', ()=>{
+    activeFlavor.ingredientsText = suggestIngredientsTextAny(activeFlavor);
+    document.getElementById('ingredientsText').value = activeFlavor.ingredientsText;
+    refreshLabel();
+  });
+  document.getElementById('toggle-format-btn').addEventListener('click', ()=>{
+    activeFlavor.ingredientsFormat = activeFlavor.ingredientsFormat==='composition' ? 'bracket' : 'composition';
+    activeFlavor.ingredientsText = suggestIngredientsTextAny(activeFlavor);
+    renderMain();
+  });
+  document.getElementById('netWeight').addEventListener('input', e=>{ activeFlavor.netWeight = Number(e.target.value)||0; refreshLabel(); });
+  document.getElementById('netTolerance').addEventListener('input', e=>{ activeFlavor.netTolerance = Number(e.target.value)||0; refreshLabel(); });
+  document.getElementById('shelfLife').addEventListener('input', e=>{ activeFlavor.shelfLife = e.target.value; refreshLabel(); });
+  attachPresetDropdown('shelfLife', ['-18°C冷凍保存60天','2個月'], v=>{ activeFlavor.shelfLife = v; refreshLabel(); });
+  document.getElementById('manufactureDate').addEventListener('input', e=>{ activeFlavor.manufactureDate = e.target.value; refreshLabel(); });
+  document.getElementById('expiryDate').addEventListener('input', e=>{ activeFlavor.expiryDate = e.target.value; refreshLabel(); });
+  attachPresetDropdown('expiryDate', ['製造日期依照出貨單上所示'], v=>{ activeFlavor.expiryDate = v; refreshLabel(); });
+  document.getElementById('calc-expiry-btn').addEventListener('click', ()=>{
+    const text = (activeFlavor.shelfLife||'').trim();
+    const monthMatch = text.match(/(\d+)\s*個?月/);
+    const dayMatch = text.match(/(\d+)\s*天/);
+    const mdText = (activeFlavor.manufactureDate||'').trim();
+    let base = new Date();
+    const mdParsed = mdText.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+    if(mdParsed){
+      base = new Date(parseInt(mdParsed[1],10), parseInt(mdParsed[2],10)-1, parseInt(mdParsed[3],10));
+    } else if(mdText){
+      alert2('看不懂製造日期的格式（例如「2026.08.15」），先用今天的日期當基準計算。');
+    }
+    let result = new Date(base);
+    if(monthMatch){ result.setMonth(result.getMonth() + parseInt(monthMatch[1],10)); }
+    else if(dayMatch){ result.setDate(result.getDate() + parseInt(dayMatch[1],10)); }
+    else { alert2('看不懂保存期限的格式（例如「2個月」「30天」），請直接手動輸入有效日期。'); return; }
+    const y = result.getFullYear();
+    const m = String(result.getMonth()+1).padStart(2,'0');
+    const d = String(result.getDate()).padStart(2,'0');
+    activeFlavor.expiryDate = `${y}.${m}.${d}`;
+    document.getElementById('expiryDate').value = activeFlavor.expiryDate;
+    refreshLabel();
+  });
+  document.getElementById('storageMethod').addEventListener('input', e=>{ activeFlavor.storageMethod = e.target.value; refreshLabel(); });
+  attachPresetDropdown('storageMethod', ['冷凍 🥶 儲存於攝氏-18°C以下','冷凍保存'], v=>{ activeFlavor.storageMethod = v; refreshLabel(); });
+  document.getElementById('originText').addEventListener('input', e=>{ activeFlavor.originText = e.target.value; refreshLabel(); });
+  document.getElementById('regen-origin-btn').addEventListener('click', ()=>{
+    activeFlavor.originText = suggestOriginText(activeFlavor);
+    document.getElementById('originText').value = activeFlavor.originText;
+    refreshLabel();
+  });
+  document.getElementById('usage-link').addEventListener('change', async e=>{
+    brand.usageLink = e.target.value;
+    await regenerateUsageQr();
+    const preview = document.getElementById('usage-qr-preview');
+    if(preview) preview.innerHTML = brand.usageQrDataUrl ? `<img src="${brand.usageQrDataUrl}" style="width:60px;height:60px;border:1px solid var(--rule);padding:4px;background:#fff;">` : '';
+    refreshLabel();
+    await dbSaveBrand(brand);
+  });
+  document.getElementById('allergyNote').addEventListener('input', e=>{ activeFlavor.allergyNote = e.target.value; refreshLabel(); });
+
+  const debouncedSaveBrand = debounce(()=>{ dbSaveBrand(brand); }, 500);
+  document.getElementById('brandName').addEventListener('input', e=>{ brand.brandName = e.target.value; refreshLabel(); debouncedSaveBrand(); });
+  document.getElementById('contactEmail').addEventListener('input', e=>{ brand.contactEmail = e.target.value; refreshLabel(); debouncedSaveBrand(); });
+  document.getElementById('igHandle').addEventListener('input', e=>{ brand.igHandle = e.target.value; refreshLabel(); debouncedSaveBrand(); });
+  document.getElementById('generalNotice').addEventListener('input', e=>{ brand.generalNotice = e.target.value; refreshLabel(); debouncedSaveBrand(); });
+  document.getElementById('staffPin').addEventListener('input', e=>{ brand.staffPin = e.target.value; debouncedSaveBrand(); });
+  document.getElementById('logo-upload').addEventListener('change', async e=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    if(file.size > 1500000){ alert2('圖片太大了，請用小於1.5MB的圖片。'); return; }
+    try{
+      const dataUrl = await new Promise((resolve,reject)=>{
+        const reader = new FileReader();
+        reader.onload = ()=>resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      brand.logoDataUrl = dataUrl;
+      await dbSaveBrand(brand);
+      renderMain();
+    }catch(err){
+      console.error('logo upload failed', err);
+      alert2('圖片上傳失敗：' + (err.message||err));
+    }
+  });
+  const removeLogoBtn = document.getElementById('remove-logo-btn');
+  if(removeLogoBtn){
+    removeLogoBtn.addEventListener('click', async ()=>{
+      brand.logoDataUrl = '';
+      await dbSaveBrand(brand);
+      renderMain();
+    });
+  }
+  document.getElementById('official-link').addEventListener('change', async e=>{
+    brand.officialLink = e.target.value;
+    await regenerateQr();
+    const preview = document.getElementById('qr-preview');
+    if(preview) preview.innerHTML = brand.qrDataUrl ? `<img src="${brand.qrDataUrl}" style="width:60px;height:60px;border:1px solid var(--rule);padding:4px;background:#fff;">` : '';
+    refreshLabel();
+    await dbSaveBrand(brand);
+  });
+  document.getElementById('qr-caption').addEventListener('input', async e=>{
+    brand.qrCaption = e.target.value;
+    refreshLabel();
+    debouncedSaveBrand();
+  });
+  document.getElementById('label-scale').addEventListener('input', async e=>{
+    brand.labelScale = Number(e.target.value)||100;
+    debouncedSaveBrand();
+    refreshLabel();
+    const scaleLabel = document.querySelector('#label-scale').previousElementSibling;
+    if(scaleLabel) scaleLabel.textContent = `標籤縮放（${brand.labelScale}%）`;
+  });
+
+  document.getElementById('db-search').addEventListener('input', e=>{ dbSearchQuery = e.target.value; renderDbRows(); });
+  document.getElementById('db-only-used-toggle').checked = showOnlyUsedIngredients;
+  document.getElementById('db-only-used-toggle').addEventListener('change', e=>{ showOnlyUsedIngredients = e.target.checked; renderDbRows(); });
+  document.getElementById('add-item-btn').addEventListener('click', ()=>{
+    const defaultIng = db.find(d=>!d.id.startsWith('tfnd_')) || db[0];
+    activeFlavor.items.push({ingredientId: defaultIng?.id||'', grams:0, group:'', bakeAffected:true});
+    renderItemRows(); refreshLabel();
+  });
+  document.getElementById('add-db-btn').addEventListener('click', async ()=>{
+    const newId = 'ing' + Date.now().toString(36);
+    const newIng = {id:newId, name:'新原料', kcal:0, protein:0, fat:0, satfat:0, transfat:0, carb:0, sugar:0, fiber:0, sodium:0, needsReview:true};
+    const ok = await dbSaveIngredient(newIng);
+    if(!ok) return;
+    db.push(newIng);
+    renderDbRows(); renderItemRows();
+  });
+  document.getElementById('ai-cost-search-btn').addEventListener('click', ()=>aiCostSearchAll(false));
+  document.getElementById('ai-cost-search-force-btn').addEventListener('click', ()=>aiCostSearchAll(true));
+  document.getElementById('save-btn').addEventListener('click', async ()=>{
+    const ok = await saveActiveFlavor(); renderSidebar();
+    if(ok){ await refreshIngredientUsage(); renderDbRows(); }
+    const btn = document.getElementById('save-btn'); const old = btn.textContent;
+    btn.textContent = ok ? '已儲存 ✓' : '儲存失敗'; setTimeout(()=>{ btn.textContent = old; }, 1400);
+  });
+  document.getElementById('download-jpg-btn').addEventListener('click', downloadJpg);
+  document.getElementById('duplicate-btn').addEventListener('click', async ()=>{
+    const id = uid();
+    const copy = JSON.parse(JSON.stringify(activeFlavor));
+    copy.id = id;
+    copy.name = activeFlavor.name + '（複製）';
+    copy.ingredientsText = '';
+    copy.sortOrder = flavorIndex.length;
+    const ok = await dbInsertFlavor(copy);
+    if(!ok) return;
+    flavorIndex.push({id, name:copy.name, category:copy.category, sortOrder:copy.sortOrder});
+    await loadFlavor(id);
+    renderSidebar();
+    renderMain();
+  });
+  document.getElementById('parse-import-btn').addEventListener('click', parseRecipeText);
+  document.getElementById('batch-download-btn').addEventListener('click', batchDownloadAll);
+  document.getElementById('batch-pdf-btn').addEventListener('click', batchDownloadPdf);
+}
+
+function renderItemRows(){
+  const wrap = document.getElementById('item-rows');
+  wrap.innerHTML = '';
+  const headRow = document.createElement('div');
+  headRow.className = 'item-row';
+  headRow.style.fontSize = '10.5px';
+  headRow.style.color = 'var(--ink-soft)';
+  headRow.innerHTML = `<span>原料</span><span>克重</span><span>子配方分類(選填)</span><span title="套用烘焙損耗">烤損</span><span></span>`;
+  wrap.appendChild(headRow);
+  activeFlavor.items.forEach((it, idx)=>{
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    const currentName = db.find(d=>d.id===it.ingredientId)?.name || '';
+    const checked = it.bakeAffected!==false ? 'checked' : '';
+    row.innerHTML = `<div style="position:relative;"><input type="text" data-idx="${idx}" class="ing-search" autocomplete="off" value="${escapeHtml(currentName)}" placeholder="輸入搜尋原料…"></div><input type="number" class="ing-grams" data-idx="${idx}" value="${it.grams}" step="0.01"><input type="text" class="ing-group" data-idx="${idx}" value="${escapeHtml(it.group||'')}" placeholder="例：酸種液、老麵"><span class="bake-check"><input type="checkbox" class="ing-bake" data-idx="${idx}" ${checked} title="這項原料要不要套用烘焙損耗"></span><button class="row-del" data-idx="${idx}">✕</button>`;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('.ing-search').forEach(el=>{
+    attachIngredientPicker(el, Number(el.dataset.idx));
+  });
+  wrap.querySelectorAll('.ing-grams').forEach(el=>{
+    el.addEventListener('input', e=>{ activeFlavor.items[e.target.dataset.idx].grams = Number(e.target.value)||0; refreshLabel(); refreshCost(); });
+  });
+  wrap.querySelectorAll('.ing-group').forEach(el=>{
+    el.addEventListener('input', e=>{ activeFlavor.items[e.target.dataset.idx].group = e.target.value; refreshLabel(); });
+  });
+  wrap.querySelectorAll('.ing-bake').forEach(el=>{
+    el.addEventListener('change', e=>{ activeFlavor.items[e.target.dataset.idx].bakeAffected = e.target.checked; refreshLabel(); });
+  });
+  wrap.querySelectorAll('.row-del').forEach(el=>{
+    el.addEventListener('click', e=>{ activeFlavor.items.splice(e.target.dataset.idx,1); renderItemRows(); refreshLabel(); });
+  });
+}
+
+let dbSearchQuery = '';
+function renderIngredientCoverageSummary(){
+  const el = document.getElementById('ingredient-coverage-summary');
+  if(!el) return;
+  const usedGlobally = db.filter(ing=>(ingredientUsageCount[ing.id]||0) > 0);
+  const missingCost = usedGlobally.filter(ing=>ing.cost===undefined || ing.cost===null);
+  if(usedGlobally.length===0){ el.innerHTML=''; return; }
+  if(missingCost.length===0){
+    el.innerHTML = `<span style="color:var(--ok);">✓ 常用原料（有在任何口味用到）共 ${usedGlobally.length} 項，成本都已填寫</span>`;
+  } else {
+    const names = missingCost.slice(0,8).map(i=>escapeHtml(i.name)).join('、') + (missingCost.length>8?` 等${missingCost.length}項`:'');
+    el.innerHTML = `<span style="color:var(--stamp);">⚠ 常用原料共 ${usedGlobally.length} 項，還有 ${missingCost.length} 項沒有成本：${names}</span>`;
+  }
+}
+function renderDbRows(){
+  const wrap = document.getElementById('db-rows');
+  wrap.innerHTML = '';
+  renderIngredientCoverageSummary();
+  const q = dbSearchQuery.trim().toLowerCase();
+  const usedIds = new Set((activeFlavor?.items||[]).map(it=>it.ingredientId));
+  // 依「用在幾款口味」由多到少排序，常用原料排最前面；用量相同則維持原本（名稱）順序。
+  let displayList = db.map((ing, idx)=>({ing, idx, usage: ingredientUsageCount[ing.id]||0}));
+  if(q) displayList = displayList.filter(e=>e.ing.name.toLowerCase().includes(q));
+  if(showOnlyUsedIngredients) displayList = displayList.filter(e=>e.usage>0);
+  displayList.sort((a,b)=> b.usage - a.usage);
+  displayList.forEach(({ing, idx, usage})=>{
+    const row = document.createElement('div');
+    row.className = 'db-row';
+    const isUsed = usedIds.has(ing.id);
+    if(isUsed) row.style.background = '#F7D9D6';
+    else if(ing.needsReview) row.style.background = 'var(--stamp-soft)';
+    row.title = isUsed ? '目前口味有用到這項原料' : '';
+    const costTitle = ing.costSearchedAt
+      ? ('上次AI查價：'+formatDateShort(ing.costSearchedAt)+(ing.costSourceNote?('｜'+ing.costSourceNote):''))
+      : '點一下用AI搜尋這項原料的市價';
+    const nutFields = ['kcal','protein','fat','satfat','transfat','carb','sugar','fiber'];
+    const nutCells = nutFields.map(f=>`<span class="db-val" data-idx="${idx}" data-field="${f}" title="雙擊修改">${f==='fiber'?(ing.fiber||0):ing[f]}</span>`).join('');
+    row.innerHTML = `
+      <input type="text" class="db-name" data-idx="${idx}" value="${escapeHtml(ing.name)}" title="${ing.needsReview?'新原料，尚未填寫營養值':''}">
+      ${nutCells}
+      <input type="number" class="db-cost" data-idx="${idx}" value="${ing.cost!==undefined?ing.cost:''}" placeholder="元" title="${ing.costSource==='actual'?'實際進貨價（你自己確認過）':ing.costSource==='ai'?'AI網路搜尋估算價':'尚未查過成本'}" style="${ing.costSource==='actual'?'border-color:#1B7A3D;border-width:2px;':ing.costSource==='ai'?'border-color:#3B82C4;':'border-color:var(--stamp);'}">
+      <button class="db-cost-search" data-idx="${idx}" title="${costTitle}" style="border:1px solid var(--rule-strong);background:#fff;border-radius:4px;font-size:11px;cursor:pointer;padding:2px 0;">🔍</button>
+      <button class="row-del" data-idx="${idx}">✕</button>`;
+    wrap.appendChild(row);
+  });
+  if(!wrap.dataset.dblclickBound){
+    wrap.dataset.dblclickBound = '1';
+    wrap.addEventListener('dblclick', e=>{
+      const span = e.target.closest('.db-val');
+      if(!span) return;
+      const idx = Number(span.dataset.idx);
+      const field = span.dataset.field;
+      const ing = db[idx];
+      if(!ing) return;
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.step = 'any';
+      input.value = ing[field]||0;
+      input.className = 'db-val-input';
+      span.replaceWith(input);
+      input.focus();
+      input.select();
+      const commit = ()=>{
+        const val = Number(input.value)||0;
+        ing[field] = val;
+        ing.needsReview = false;
+        debouncedSaveIngredientRow(ing);
+        refreshLabel(); refreshCost();
+        const newSpan = document.createElement('span');
+        newSpan.className = 'db-val';
+        newSpan.dataset.idx = String(idx);
+        newSpan.dataset.field = field;
+        newSpan.textContent = val;
+        input.replaceWith(newSpan);
+      };
+      input.addEventListener('blur', commit, {once:true});
+      input.addEventListener('keydown', ev=>{
+        if(ev.key==='Enter'){ input.blur(); }
+        if(ev.key==='Escape'){ input.value = ing[field]||0; input.blur(); }
+      });
+    });
+  }
+  wrap.querySelectorAll('.db-name').forEach(el=>{
+    el.addEventListener('input', e=>{ db[e.target.dataset.idx].name = e.target.value; debouncedSaveIngredientRow(db[e.target.dataset.idx]); renderItemRows(); });
+  });
+  wrap.querySelectorAll('.db-cost').forEach(el=>{
+    el.addEventListener('input', e=>{
+      const ing = db[e.target.dataset.idx];
+      ing.cost = Number(e.target.value)||0;
+      ing.costSource = 'actual';
+      debouncedSaveIngredientRow(ing);
+      refreshCost();
+    });
+    el.addEventListener('input', debounce(()=>{ renderDbRows(); }, 700));
+  });
+  wrap.querySelectorAll('.db-cost-search').forEach(el=>{
+    el.addEventListener('click', e=>{ searchSingleCost(Number(e.target.dataset.idx)); });
+  });
+  wrap.querySelectorAll('.row-del').forEach(el=>{
+    el.addEventListener('click', async e=>{
+      const idx = Number(e.target.dataset.idx);
+      const ing = db[idx];
+      if(usedIds.has(ing.id)){
+        if(!confirm(`「${ing.name}」目前有口味在用，刪除後那些口味的這項原料會找不到資料，確定要刪除嗎？`)) return;
+      }
+      const ok = await dbDeleteIngredient(ing.id);
+      if(!ok) return;
+      db.splice(idx,1);
+      renderDbRows(); renderItemRows(); refreshLabel();
+    });
+  });
+}
+
+// 把 AI 回傳的成本＋營養估算套用到原料上。有 needsReview 的原料（營養值全掛0）
+// 順便補上營養估算，不用另外再花一次AI額度查營養。
+function applyCostAndNutritionResult(ing, r){
+  if(typeof r.costPer100g === 'number'){
+    ing.cost = r.costPer100g;
+    ing.costSource = 'ai';
+    ing.costSearchedAt = new Date().toISOString();
+    ing.costSourceNote = r.sourceNote || '';
+  }
+  if(ing.needsReview && typeof r.kcal === 'number'){
+    ['kcal','protein','fat','satfat','transfat','carb','sugar','fiber','sodium'].forEach(f=>{
+      if(typeof r[f] === 'number') ing[f] = r[f];
+    });
+    ing.needsReview = false;
+  }
+}
+
+async function searchSingleCost(idx){
+  const ing = db[idx];
+  if(!ing) return;
+  const btn = document.querySelector(`.db-cost-search[data-idx="${idx}"]`);
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  try{
+    const data = await callAiProxy('search-cost', {names:[ing.name]});
+    const r = (data.results||[])[0];
+    if(r && typeof r.costPer100g === 'number'){
+      applyCostAndNutritionResult(ing, r);
+      await dbSaveIngredient(ing);
+      refreshLabel(); refreshCost();
+    } else {
+      alert2('沒查到「'+ing.name+'」的價格，可以再試一次。');
+    }
+  }catch(e){
+    console.error(e);
+    alert2('查詢「'+ing.name+'」成本失敗：'+(e.message||e));
+  }
+  renderDbRows();
+}
+
+function refreshLabel(){
+  const calc = calcLabel(activeFlavor);
+  document.getElementById('label-capture').innerHTML = fullLabelHtml(activeFlavor, calc);
+  const totalDisplay = document.getElementById('total-raw-display');
+  if(totalDisplay) totalDisplay.textContent = round(calc.totalRaw,1) + ' 公克';
+}
+
+function refreshCost(){
+  const cost = calcCost(activeFlavor);
+  const warn = document.getElementById('cost-missing-warning');
+  if(warn) warn.innerHTML = cost.baselineMetCount < cost.totalUniqueIngredients ? `<div style="font-size:9.5px;color:var(--stamp);margin-bottom:4px;">⚠ 成本涵蓋率 ${cost.baselineMetCount}/${cost.totalUniqueIngredients}，還有原料沒查過成本</div>` : `<div style="font-size:9.5px;color:var(--ok);margin-bottom:4px;">✓ 成本涵蓋率 ${cost.totalUniqueIngredients}/${cost.totalUniqueIngredients}${cost.actualCount?`（其中${cost.actualCount}項是你確認過的實際進貨價）`:''}</div>`;
+  const ingDisplay = document.getElementById('ingredient-cost-display');
+  if(ingDisplay) ingDisplay.textContent = 'NT$ ' + cost.ingredientCost.toFixed(1);
+  const cogsDisplay = document.getElementById('cogs-display');
+  if(cogsDisplay) cogsDisplay.textContent = 'NT$ ' + cost.cogs.toFixed(1);
+  const marginDisplay = document.getElementById('margin-current-display');
+  if(marginDisplay) marginDisplay.innerHTML = cost.marginAtPrice!==null ? `毛利 <b>${cost.marginAtPrice.toFixed(1)}%</b>` : '';
+  const marginTable = document.getElementById('margin-table-body');
+  if(marginTable) marginTable.innerHTML = cost.marginTargets.map(t=>`<div style="background:#fff;border:1px solid var(--rule);border-radius:4px;padding:3px 2px;"><div style="font-size:9px;color:var(--ink-soft);">${t.pct}%</div><div style="font-size:10.5px;font-weight:600;">$${t.suggestedPrice}</div></div>`).join('');
+}
+
+// ============================================================
+// QR Code（不持久化，每次依連結內容即時產生）
+// ============================================================
+async function regenerateQr(){
+  const link = (brand.officialLink||'').trim();
+  if(!link){ brand.qrDataUrl = ''; return; }
+  try{
+    const host = document.getElementById('qr-gen-hidden');
+    host.innerHTML = '';
+    new QRCode(host, {text: link, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M});
+    await new Promise(r=>setTimeout(r, 150));
+    const canvas = host.querySelector('canvas');
+    const img = host.querySelector('img');
+    let dataUrl = '';
+    if(canvas && canvas.toDataURL){ dataUrl = canvas.toDataURL('image/png'); }
+    else if(img && img.src){ dataUrl = img.src; }
+    brand.qrDataUrl = dataUrl || '';
+  }catch(e){
+    console.error('QR generation failed', e);
+    alert2('QR Code 產生失敗：' + (e.message||e));
+  }
+}
+async function regenerateUsageQr(){
+  const link = (brand.usageLink||'').trim();
+  if(!link){ brand.usageQrDataUrl = ''; return; }
+  try{
+    const host = document.getElementById('qr-gen-hidden');
+    host.innerHTML = '';
+    new QRCode(host, {text: link, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M});
+    await new Promise(r=>setTimeout(r, 150));
+    const canvas = host.querySelector('canvas');
+    const img = host.querySelector('img');
+    let dataUrl = '';
+    if(canvas && canvas.toDataURL){ dataUrl = canvas.toDataURL('image/png'); }
+    else if(img && img.src){ dataUrl = img.src; }
+    brand.usageQrDataUrl = dataUrl || '';
+  }catch(e){
+    console.error('Usage QR generation failed', e);
+    alert2('食用方式 QR Code 產生失敗：' + (e.message||e));
+  }
+}
+
+function setImportStatus(msg){ const el = document.getElementById('import-status'); if(el) el.textContent = msg; }
+function setCostSearchStatus(msg){ const el = document.getElementById('cost-search-status'); if(el) el.textContent = msg; }
+
+// ============================================================
+// AI：配方解析 / 成本搜尋（都透過 Supabase Edge Function 代理）
+// ============================================================
+async function parseRecipeText(){
+  const raw = document.getElementById('import-text').value.trim();
+  if(!raw){ setImportStatus('請先貼上配方文字。'); return; }
+  setImportStatus('解析中，請稍候…');
+  try{
+    // 只把「常用/簡稱」原料名稱給AI參考，不含大量政府資料庫的正式學名，
+    // 避免每次解析配方都要多送幾千字的原料清單、徒增花費又沒什麼幫助。
+    const knownNames = db.filter(d=>!d.id.startsWith('tfnd_')).map(d=>d.name);
+    const data = await callAiProxy('parse-recipe', {rawText: raw, knownNames});
+    const parsed = data.flavors;
+    if(!Array.isArray(parsed) || parsed.length===0) throw new Error('AI沒有回傳任何口味');
+    await importParsedFlavors(parsed);
+    setImportStatus(`已匯入 ${parsed.length} 個口味 ✓ 新原料若營養值為0，請至下方資料庫補上實際數值。`);
+    document.getElementById('import-text').value = '';
+  }catch(e){
+    console.error(e);
+    setImportStatus('解析失敗：' + (e.message||e) + '（配方太長可能被截斷，可以試著一次貼少一點口味分批匯入）');
+  }
+}
+
+async function importParsedFlavors(parsedFlavors){
+  let firstNewId = null;
+  let sortBase = flavorIndex.length;
+  for(const pf of parsedFlavors){
+    const id = uid();
+    if(!firstNewId) firstNewId = id;
+    const flavorObj = hydrateFlavor({
+      id, name: pf.name || '未命名口味', items: [], servingRaw: Number(pf.servingRaw)||100, bakeLoss: 10,
+      note:'AI 解析匯入', ingredientsText:'', netWeight:0, netTolerance:10, shelfLife:'', storageMethod:'冷凍保存',
+      allergyNote:'', packageServings:1, category: pf.category||'', sortOrder: sortBase++
+    });
+    for(const ing of (pf.items||[])){
+      let dbEntry = db.find(d=>d.name===ing.name);
+      if(!dbEntry){
+        dbEntry = {id:'ing'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), name: ing.name||'新原料',
+          kcal:0, protein:0, fat:0, satfat:0, transfat:0, carb:0, sugar:0, fiber:0, sodium:0, needsReview:true};
+        db.push(dbEntry);
+        await dbSaveIngredient(dbEntry);
+      }
+      flavorObj.items.push({ingredientId: dbEntry.id, grams: Number(ing.grams)||0, group: (ing.group||'').trim(), bakeAffected: ing.bakeAffected!==false});
+    }
+    const ok = await dbInsertFlavor(flavorObj);
+    if(ok) flavorIndex.push({id, name:flavorObj.name, category:flavorObj.category, sortOrder:flavorObj.sortOrder});
+  }
+  if(firstNewId){ await loadFlavor(firstNewId); }
+  renderSidebar();
+  renderMain();
+}
+
+async function aiCostSearchAll(forceAll){
+  const btn = document.getElementById('ai-cost-search-btn');
+  if(btn) btn.disabled = true;
+  const targets = forceAll
+    ? db.filter(ing=>ing.costSource!=='actual')
+    : db.filter(ing=>ing.costSource!=='ai' && ing.costSource!=='actual');
+  if(targets.length === 0){
+    setCostSearchStatus('所有原料都已經查過成本了，沒有需要搜尋的項目。');
+    if(btn) btn.disabled = false;
+    return;
+  }
+  const chunkSize = 8;
+  const chunks = [];
+  for(let i=0;i<targets.length;i+=chunkSize){ chunks.push(targets.slice(i,i+chunkSize)); }
+  let updatedCount = 0;
+  let failedChunks = 0;
+  for(let c=0;c<chunks.length;c++){
+    setCostSearchStatus(`搜尋中… (${c+1}/${chunks.length} 批，只查還沒驗證過的原料)`);
+    const chunk = chunks[c];
+    const names = chunk.map(ing=>ing.name);
+    try{
+      const data = await callAiProxy('search-cost', {names});
+      const results = data.results || [];
+      for(const r of results){
+        const target = chunk.find(ing=>ing.name===r.name) || db.find(ing=>ing.name===r.name);
+        if(target && typeof r.costPer100g === 'number' && r.costPer100g>=0){
+          applyCostAndNutritionResult(target, r);
+          await dbSaveIngredient(target);
+          updatedCount++;
+        }
+      }
+      renderDbRows();
+      refreshLabel();
+      refreshCost();
+    }catch(chunkErr){
+      console.error('chunk failed', chunkErr);
+      failedChunks++;
+    }
+    await new Promise(r=>setTimeout(r, 300));
+  }
+  setCostSearchStatus(`完成 ✓ 已更新 ${updatedCount} 項原料成本${failedChunks?`，有 ${failedChunks} 批查詢失敗（可再按一次重新搜尋，已成功的不會被覆蓋掉）`:''}`);
+  if(btn) btn.disabled = false;
+}
+
+// ============================================================
+// 匯出（JPG / PDF）— 邏輯不變，仍是純前端 canvas 截圖
+// ============================================================
+async function batchDownloadAll(){
+  const originalId = activeId;
+  setImportStatus('批次匯出中…');
+  const btn = document.getElementById('batch-download-btn');
+  if(btn) btn.disabled = true;
+  for(const f of flavorIndex){
+    await loadFlavor(f.id);
+    const calc = calcLabel(activeFlavor);
+    const temp = document.createElement('div');
+    temp.style.position = 'fixed'; temp.style.left = '-9999px'; temp.style.top = '0';
+    temp.innerHTML = fullLabelHtml(activeFlavor, calc);
+    document.body.appendChild(temp);
+    try{
+      const canvas = await html2canvas(temp.firstElementChild, {backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true, logging:false});
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      const link = document.createElement('a');
+      link.download = (activeFlavor.name || '口味') + '.jpg';
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }catch(e){ console.error('batch export failed for', f.name, e); }
+    document.body.removeChild(temp);
+    await new Promise(r=>setTimeout(r, 500));
+  }
+  await loadFlavor(originalId);
+  renderSidebar();
+  renderMain();
+  setImportStatus('批次匯出完成 ✓');
+  if(btn) btn.disabled = false;
+}
+
+async function batchDownloadPdf(){
+  const originalId = activeId;
+  setImportStatus('批次匯出 PDF 中…');
+  const btn = document.getElementById('batch-pdf-btn');
+  if(btn) btn.disabled = true;
+  try{
+    if(!window.jspdf || !window.jspdf.jsPDF){ throw new Error('PDF 元件尚未載入完成，請稍等幾秒再試一次'); }
+    const { jsPDF } = window.jspdf;
+    let pdf = null;
+    for(const f of flavorIndex){
+      await loadFlavor(f.id);
+      const calc = calcLabel(activeFlavor);
+      const temp = document.createElement('div');
+      temp.style.position = 'fixed'; temp.style.left = '-9999px'; temp.style.top = '0';
+      temp.innerHTML = fullLabelHtml(activeFlavor, calc);
+      document.body.appendChild(temp);
+      const canvas = await html2canvas(temp.firstElementChild, {backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true, logging:false});
+      document.body.removeChild(temp);
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pageW = 210, margin = 10;
+      const imgW = pageW - margin*2;
+      const imgH = imgW * (canvas.height / canvas.width);
+      if(!pdf){ pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'}); }
+      else { pdf.addPage(); }
+      pdf.setFontSize(11);
+      pdf.text(activeFlavor.name || '', margin, margin);
+      pdf.addImage(imgData, 'JPEG', margin, margin+6, imgW, imgH);
+    }
+    if(pdf) pdf.save('全部口味營養標示.pdf');
+    setImportStatus('PDF 匯出完成 ✓');
+  }catch(e){
+    console.error('batch pdf failed', e);
+    setImportStatus('PDF 匯出失敗：' + (e.message||e));
+  }
+  await loadFlavor(originalId);
+  renderSidebar();
+  renderMain();
+  if(btn) btn.disabled = false;
+}
+
+async function downloadJpg(){
+  const el = document.getElementById('label-capture');
+  try{
+    const canvas = await html2canvas(el, {backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true, logging:false});
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const link = document.createElement('a');
+    link.download = (activeFlavor.name||'營養標示') + '.jpg';
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }catch(e){
+    console.error('JPG export failed', e);
+    alert2('JPG匯出失敗：' + (e.message||e));
+  }
+}
+
+init();
+</script>
+</body>
+</html>
