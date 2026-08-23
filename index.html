@@ -9,7 +9,28 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
+<script>
+// ============================================================
+// 連線設定 —— 這三個值要填你自己的
+// ============================================================
+
+// Supabase 專案設定：Project Settings → API
+window.SUPABASE_URL = "https://ulachaisrwvxliwcrvik.supabase.co";
+window.SUPABASE_ANON_KEY = "sb_publishable_vgiVhIZKXCGJz_rD37IIrQ_hKP9RWOc";
+
+// Edge Function 網址：跟你的 SUPABASE_URL 同一個 domain，路徑固定是 /functions/v1/ai-proxy
+window.AI_PROXY_URL = "https://ulachaisrwvxliwcrvik.supabase.co/functions/v1/ai-proxy";
+
+// ⚠️ 這行還沒填：跟你剛剛在 Supabase Secrets 畫面設定的 APP_SHARED_SECRET 要一模一樣，
+// 這個值只有你知道（我沒有幫你打進 Supabase 的欄位），請自己把下面這行改成一樣的值。
+window.APP_SHARED_SECRET = "cica0915954954";
+
+// 這個系統是純內部後台工具，畫面會用這組 PIN 擋一次
+// （只是介面層阻擋，不是資安等級防護，跟 brand_settings 資料表裡的 staff_pin 保持一致即可，
+//  也可以直接在畫面「品牌設定」裡改，改完會存進資料庫，這裡的值只是還沒連上資料庫前的預設值）
+window.DEFAULT_STAFF_PIN = "8888";
+
+</script>
 <style>
   :root{
     --paper:#F6F3EC;
