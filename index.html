@@ -585,11 +585,7 @@ function hydrateFlavor(flavor){
   if(flavor.category===undefined) flavor.category = '';
   if(!flavor.packageServings) flavor.packageServings = 1;
   if(!flavor.shelfLife) flavor.shelfLife = '-18°C冷凍保存60天';
-  if(!flavor.manufactureDate){
-    const t = new Date();
-    flavor.manufactureDate = `${t.getFullYear()}.${String(t.getMonth()+1).padStart(2,'0')}.${String(t.getDate()).padStart(2,'0')}`;
-  }
-  if(!flavor.expiryDate) flavor.expiryDate = '製造日期依照出貨單上所示';
+  if(!flavor.manufactureDate) flavor.manufactureDate = '製造日期依照出貨單上所示';
   if(!flavor.originText){ flavor.originText = suggestOriginText(flavor); }
   if(!flavor.storageMethod) flavor.storageMethod = '冷凍 🥶 儲存於攝氏-18°C以下';
   if(!flavor.allergyNote){
@@ -1020,7 +1016,6 @@ function renderMain(){
     <div class="top-row">
       <input class="name-input" id="flavor-name" value="${escapeHtml(activeFlavor.name)}">
       <div class="actions">
-        <button class="btn" id="duplicate-btn">複製此口味</button>
         <button class="btn" id="batch-download-btn">批次JPG</button>
         <button class="btn" id="batch-pdf-btn">批次PDF</button>
         <button class="btn" id="download-jpg-btn">下載 JPG</button>
@@ -1205,8 +1200,8 @@ function renderMain(){
   document.getElementById('shelfLife').addEventListener('input', e=>{ activeFlavor.shelfLife = e.target.value; refreshLabel(); });
   attachPresetDropdown('shelfLife', ['-18°C冷凍保存60天','2個月'], v=>{ activeFlavor.shelfLife = v; refreshLabel(); });
   document.getElementById('manufactureDate').addEventListener('input', e=>{ activeFlavor.manufactureDate = e.target.value; refreshLabel(); });
+  attachPresetDropdown('manufactureDate', ['製造日期依照出貨單上所示'], v=>{ activeFlavor.manufactureDate = v; refreshLabel(); });
   document.getElementById('expiryDate').addEventListener('input', e=>{ activeFlavor.expiryDate = e.target.value; refreshLabel(); });
-  attachPresetDropdown('expiryDate', ['製造日期依照出貨單上所示'], v=>{ activeFlavor.expiryDate = v; refreshLabel(); });
   document.getElementById('calc-expiry-btn').addEventListener('click', ()=>{
     const text = (activeFlavor.shelfLife||'').trim();
     const monthMatch = text.match(/(\d+)\s*個?月/);
@@ -1327,23 +1322,63 @@ function renderMain(){
     btn.textContent = ok ? '已儲存 ✓' : '儲存失敗'; setTimeout(()=>{ btn.textContent = old; }, 1400);
   });
   document.getElementById('download-jpg-btn').addEventListener('click', downloadJpg);
-  document.getElementById('duplicate-btn').addEventListener('click', async ()=>{
-    const id = uid();
-    const copy = JSON.parse(JSON.stringify(activeFlavor));
-    copy.id = id;
-    copy.name = activeFlavor.name + '（複製）';
-    copy.ingredientsText = '';
-    copy.sortOrder = flavorIndex.length;
-    const ok = await dbInsertFlavor(copy);
-    if(!ok) return;
-    flavorIndex.push({id, name:copy.name, category:copy.category, sortOrder:copy.sortOrder});
-    await loadFlavor(id);
-    renderSidebar();
-    renderMain();
-  });
   document.getElementById('parse-import-btn').addEventListener('click', parseRecipeText);
-  document.getElementById('batch-download-btn').addEventListener('click', batchDownloadAll);
-  document.getElementById('batch-pdf-btn').addEventListener('click', batchDownloadPdf);
+  document.getElementById('batch-download-btn').addEventListener('click', ()=>{
+    showFlavorPickerModal();
+  });
+  document.getElementById('batch-pdf-btn').addEventListener('click', ()=>{
+    showFlavorPickerModal();
+  });
+}
+
+function showFlavorPickerModal(){
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(43,38,33,0.55);display:flex;align-items:center;justify-content:center;z-index:10000;';
+  const checked = new Set(flavorIndex.map(f=>f.id));
+  overlay.innerHTML = `
+    <div style="background:#fff;padding:24px;border-radius:10px;width:420px;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;">
+      <div style="font-family:'Roboto Slab',serif;font-weight:700;font-size:16px;margin-bottom:4px;color:var(--ink);">選擇要匯出的口味</div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">勾選之後，下面可以選擇匯出成批次 JPG 或批次 PDF</div>
+      <div style="margin-bottom:8px;display:flex;gap:12px;">
+        <button type="button" id="fp-select-all" class="btn" style="font-size:11px;padding:4px 10px;">全選</button>
+        <button type="button" id="fp-select-none" class="btn" style="font-size:11px;padding:4px 10px;">取消全選</button>
+      </div>
+      <div id="fp-list" style="overflow-y:auto;flex:1;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:8px 0;margin-bottom:14px;">
+        ${flavorIndex.map(f=>`
+          <label style="display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" class="fp-check" value="${f.id}" checked>
+            <span>${escapeHtml(f.name)}${f.category?`<span style="color:var(--ink-soft);font-size:11px;"> ・${escapeHtml(f.category)}</span>`:''}</span>
+          </label>`).join('')}
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" id="fp-cancel" class="btn" style="font-size:12px;">取消</button>
+        <button type="button" id="fp-jpg" class="btn primary" style="font-size:12px;">匯出 JPG</button>
+        <button type="button" id="fp-pdf" class="btn primary" style="font-size:12px;">匯出 PDF</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const getSelectedIds = ()=> Array.from(overlay.querySelectorAll('.fp-check:checked')).map(el=>el.value);
+  overlay.querySelector('#fp-select-all').addEventListener('click', ()=>{
+    overlay.querySelectorAll('.fp-check').forEach(el=>{ el.checked = true; });
+  });
+  overlay.querySelector('#fp-select-none').addEventListener('click', ()=>{
+    overlay.querySelectorAll('.fp-check').forEach(el=>{ el.checked = false; });
+  });
+  overlay.querySelector('#fp-cancel').addEventListener('click', ()=>{
+    document.body.removeChild(overlay);
+  });
+  overlay.querySelector('#fp-jpg').addEventListener('click', async ()=>{
+    const ids = getSelectedIds();
+    document.body.removeChild(overlay);
+    if(ids.length===0){ alert2('至少要選一個口味'); return; }
+    await batchDownloadAll(ids);
+  });
+  overlay.querySelector('#fp-pdf').addEventListener('click', async ()=>{
+    const ids = getSelectedIds();
+    document.body.removeChild(overlay);
+    if(ids.length===0){ alert2('至少要選一個口味'); return; }
+    await batchDownloadPdf(ids);
+  });
 }
 
 function renderItemRows(){
@@ -1697,12 +1732,13 @@ async function aiCostSearchAll(forceAll){
 // ============================================================
 // 匯出（JPG / PDF）— 邏輯不變，仍是純前端 canvas 截圖
 // ============================================================
-async function batchDownloadAll(){
+async function batchDownloadAll(selectedIds){
   const originalId = activeId;
+  const targets = selectedIds ? flavorIndex.filter(f=>selectedIds.includes(f.id)) : flavorIndex;
   setImportStatus('批次匯出中…');
   const btn = document.getElementById('batch-download-btn');
   if(btn) btn.disabled = true;
-  for(const f of flavorIndex){
+  for(const f of targets){
     await loadFlavor(f.id);
     const calc = calcLabel(activeFlavor);
     const temp = document.createElement('div');
@@ -1729,8 +1765,9 @@ async function batchDownloadAll(){
   if(btn) btn.disabled = false;
 }
 
-async function batchDownloadPdf(){
+async function batchDownloadPdf(selectedIds){
   const originalId = activeId;
+  const targets = selectedIds ? flavorIndex.filter(f=>selectedIds.includes(f.id)) : flavorIndex;
   setImportStatus('批次匯出 PDF 中…');
   const btn = document.getElementById('batch-pdf-btn');
   if(btn) btn.disabled = true;
@@ -1738,7 +1775,7 @@ async function batchDownloadPdf(){
     if(!window.jspdf || !window.jspdf.jsPDF){ throw new Error('PDF 元件尚未載入完成，請稍等幾秒再試一次'); }
     const { jsPDF } = window.jspdf;
     let pdf = null;
-    for(const f of flavorIndex){
+    for(const f of targets){
       await loadFlavor(f.id);
       const calc = calcLabel(activeFlavor);
       const temp = document.createElement('div');
