@@ -1713,7 +1713,7 @@ async function parseRecipeText(){
     const parsed = data.flavors;
     if(!Array.isArray(parsed) || parsed.length===0) throw new Error('AI沒有回傳任何口味');
     await importParsedFlavors(parsed);
-    setImportStatus(`已匯入 ${parsed.length} 個口味 ✓ 新原料若營養值為0，請至下方資料庫補上實際數值。`);
+    setImportStatus(`在裡面找到 ${parsed.length} 款口味，已經全部匯入並自動分類 ✓ 新原料若營養值為0，請至下方資料庫補上實際數值。`);
     document.getElementById('import-text').value = '';
   }catch(e){
     console.error(e);
@@ -1734,7 +1734,7 @@ async function parseRecipeFromUrl(){
     const parsed = data.flavors;
     if(!Array.isArray(parsed) || parsed.length===0) throw new Error('AI沒有回傳任何口味');
     await importParsedFlavors(parsed);
-    statusEl.textContent = `已匯入 ${parsed.length} 個口味 ✓ 新原料若營養值為0，請至下方資料庫補上實際數值。`;
+    statusEl.textContent = `在裡面找到 ${parsed.length} 款口味，已經全部匯入並自動分類 ✓ 新原料若營養值為0，請至下方資料庫補上實際數值。`;
     document.getElementById('import-url').value = '';
   }catch(e){
     console.error(e);
