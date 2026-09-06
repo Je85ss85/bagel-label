@@ -1027,7 +1027,7 @@ function renderMain(){
 
     <div class="grid2">
       <div>
-        <div class="section-title">匯入配方（貼上文字，AI 自動解析，可一次貼多款口味）</div>
+        <div class="section-title">匯入配方（懶得一項項手動輸入？貼上文字讓AI幫你拆解，可一次貼多款口味）</div>
         <div class="panel">
           <textarea id="import-text" placeholder="把配方文字貼在這裡，可以包含多款口味、多層酵種（母種／酸液種／老麵等）。" style="min-height:120px;"></textarea>
           <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
@@ -1433,9 +1433,19 @@ function renderIngredientCoverageSummary(){
   if(missingCost.length===0){
     el.innerHTML = `<span style="color:var(--ok);">✓ 常用原料（有在任何口味用到）共 ${usedGlobally.length} 項，成本都已填寫</span>`;
   } else {
-    const names = missingCost.slice(0,8).map(i=>escapeHtml(i.name)).join('、') + (missingCost.length>8?` 等${missingCost.length}項`:'');
-    el.innerHTML = `<span style="color:var(--stamp);">⚠ 常用原料共 ${usedGlobally.length} 項，還有 ${missingCost.length} 項沒有成本：${names}</span>`;
+    const nameLinks = missingCost.slice(0,8).map(i=>`<span class="jump-to-ing" data-name="${escapeHtml(i.name)}" style="text-decoration:underline;cursor:pointer;">${escapeHtml(i.name)}</span>`).join('、') + (missingCost.length>8?` 等${missingCost.length}項`:'');
+    el.innerHTML = `<span style="color:var(--stamp);">⚠ 常用原料共 ${usedGlobally.length} 項，還有 ${missingCost.length} 項沒有成本：${nameLinks}（點名稱可以跳過去）</span>`;
+    el.querySelectorAll('.jump-to-ing').forEach(span=>{
+      span.addEventListener('click', ()=>jumpToIngredient(span.dataset.name));
+    });
   }
+}
+function jumpToIngredient(name){
+  dbSearchQuery = name;
+  const input = document.getElementById('db-search');
+  if(input) input.value = name;
+  renderDbRows();
+  document.getElementById('db-rows')?.scrollIntoView({behavior:'smooth', block:'center'});
 }
 function renderDbRows(){
   const wrap = document.getElementById('db-rows');
