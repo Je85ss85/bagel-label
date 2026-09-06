@@ -404,6 +404,17 @@ async function dbUpdateFlavorCategory(id, category){
   if(error){ alert2('更新分類失敗：'+error.message); return false; }
   return true;
 }
+async function reorderCategory(draggedCat, targetCat){
+  const catOf = f => (f.category||'').trim() || '未分類';
+  const draggedItems = flavorIndex.filter(f=>catOf(f)===draggedCat);
+  const rest = flavorIndex.filter(f=>catOf(f)!==draggedCat);
+  const insertAt = rest.findIndex(f=>catOf(f)===targetCat);
+  const newIndex = insertAt === -1 ? [...rest, ...draggedItems] : [...rest.slice(0,insertAt), ...draggedItems, ...rest.slice(insertAt)];
+  flavorIndex = newIndex;
+  const ok = await persistFlavorIndexOrder();
+  if(!ok) return;
+  renderSidebar();
+}
 async function persistFlavorIndexOrder(){
   for(let i=0;i<flavorIndex.length;i++){
     const {error} = await sb.from('flavors').update({sort_order:i}).eq('id', flavorIndex[i].id);
@@ -675,17 +686,30 @@ function renderSidebar(){
   order.forEach(cat=>{
     const isCollapsed = q ? false : collapsedCategories.has(cat);
     const head = document.createElement('div');
+    head.draggable = true;
+    head.dataset.cat = cat;
     head.style.cssText = 'font-size:10.5px;color:#B8A98C;text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 4px;padding-left:2px;cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none;';
     head.innerHTML = `<span style="display:inline-block;transition:transform 0.15s;transform:rotate(${isCollapsed?'-90deg':'0deg'});">▾</span><span>${escapeHtml(cat)}（${categorized[cat].length}）</span>`;
     head.addEventListener('click', ()=>{
       if(collapsedCategories.has(cat)) collapsedCategories.delete(cat); else collapsedCategories.add(cat);
       renderSidebar();
     });
+    head.addEventListener('dragstart', (e)=>{
+      e.stopPropagation();
+      e.dataTransfer.setData('application/x-category', cat);
+      e.dataTransfer.effectAllowed = 'move';
+    });
     head.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect = 'move'; head.style.background = 'rgba(200,155,63,0.25)'; head.style.borderRadius = '4px'; });
     head.addEventListener('dragleave', ()=>{ head.style.background = ''; });
     head.addEventListener('drop', async (e)=>{
       e.preventDefault();
       head.style.background = '';
+      const draggedCat = e.dataTransfer.getData('application/x-category');
+      if(draggedCat){
+        if(draggedCat === cat) return;
+        await reorderCategory(draggedCat, cat);
+        return;
+      }
       const draggedId = e.dataTransfer.getData('text/plain');
       if(!draggedId) return;
       const newCat = cat === '未分類' ? '' : cat;
@@ -1525,6 +1549,7 @@ function renderDbRows(){
       ing.costSource = 'actual';
       debouncedSaveIngredientRow(ing);
       refreshCost();
+      renderIngredientCoverageSummary();
     });
     el.addEventListener('input', debounce(()=>{ renderDbRows(); }, 700));
   });
