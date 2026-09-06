@@ -126,6 +126,8 @@ window.DEFAULT_STAFF_PIN = "8888";
   .flavor-list::-webkit-scrollbar-thumb{background:#7A6248;border-radius:3px;}
   .empty-state{color:var(--ink-soft);font-size:14px;padding:60px 0;text-align:center;}
   .db-cost-search:disabled{opacity:0.5;cursor:default;}
+  .spinner{display:inline-block;width:11px;height:11px;border:2px solid var(--rule-strong);border-top-color:var(--wheat);border-radius:50%;animation:spin 0.7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
   input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
   input[type=number]{ -moz-appearance:textfield; }
   .db-val{display:flex;align-items:center;justify-content:center;height:100%;min-height:18px;font-size:10.5px;cursor:text;border:1px solid transparent;border-radius:3px;padding:3px 1px;color:var(--ink);}
@@ -759,7 +761,7 @@ document.getElementById('new-flavor-btn').addEventListener('click', async ()=>{
   const id = uid();
   const fresh = hydrateFlavor({
     id, name:'新口味', items:[], servingRaw:100, bakeLoss:10, note:'',
-    ingredientsText:'', netWeight:100, netTolerance:10, shelfLife:'', storageMethod:'',
+    ingredientsText:'', netWeight:0, netTolerance:10, shelfLife:'', storageMethod:'',
     allergyNote:'', packageServings:1, category:'', sortOrder: flavorIndex ? flavorIndex.length : 0
   });
   const ok = await dbInsertFlavor(fresh);
@@ -1107,7 +1109,7 @@ function renderMain(){
         <div class="panel">
           <div class="field"><label>成份 <button type="button" id="regen-ingredients-btn" style="border:none;background:none;color:var(--wheat);cursor:pointer;font-size:11px;text-decoration:underline;">重新產生建議</button> <button type="button" id="toggle-format-btn" style="border:none;background:none;color:var(--ink-soft);cursor:pointer;font-size:11px;text-decoration:underline;">切換格式（目前：${activeFlavor.ingredientsFormat==='composition'?'組成＋細項':'括號分類'}）</button></label><textarea id="ingredientsText" style="min-height:80px;">${escapeHtml(activeFlavor.ingredientsText||'')}</textarea></div>
           <div class="meta-grid">
-            <div class="field"><label>內容量（克）</label><input type="number" id="netWeight" value="${activeFlavor.netWeight||0}"></div>
+            <div class="field"><label>內容量（克） <button type="button" id="calc-netweight-btn" style="border:none;background:none;color:var(--wheat);cursor:pointer;font-size:10.5px;text-decoration:underline;">用份量+烘焙設定自動算</button></label><input type="number" id="netWeight" value="${activeFlavor.netWeight||0}"></div>
             <div class="field"><label>公差 ±（克）</label><input type="number" id="netTolerance" value="${activeFlavor.netTolerance||0}"></div>
           </div>
           <div class="field" style="position:relative;"><label>保存期限</label><input type="text" id="shelfLife" autocomplete="off" value="${escapeHtml(activeFlavor.shelfLife||'')}"></div>
@@ -1196,6 +1198,12 @@ function renderMain(){
     renderMain();
   });
   document.getElementById('netWeight').addEventListener('input', e=>{ activeFlavor.netWeight = Number(e.target.value)||0; refreshLabel(); });
+  document.getElementById('calc-netweight-btn').addEventListener('click', ()=>{
+    const calc = calcLabel(activeFlavor);
+    activeFlavor.netWeight = Math.round(calc.servingBaked) || 0;
+    document.getElementById('netWeight').value = activeFlavor.netWeight;
+    refreshLabel();
+  });
   document.getElementById('netTolerance').addEventListener('input', e=>{ activeFlavor.netTolerance = Number(e.target.value)||0; refreshLabel(); });
   document.getElementById('shelfLife').addEventListener('input', e=>{ activeFlavor.shelfLife = e.target.value; refreshLabel(); });
   attachPresetDropdown('shelfLife', ['-18°C冷凍保存60天','2個月'], v=>{ activeFlavor.shelfLife = v; refreshLabel(); });
@@ -1549,7 +1557,7 @@ async function searchSingleCost(idx){
   const ing = db[idx];
   if(!ing) return;
   const btn = document.querySelector(`.db-cost-search[data-idx="${idx}"]`);
-  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
   try{
     const data = await callAiProxy('search-cost', {names:[ing.name]});
     const r = (data.results||[])[0];
