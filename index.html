@@ -1701,7 +1701,7 @@ function setCostSearchStatus(msg){ const el = document.getElementById('cost-sear
 // ============================================================
 // AI：配方解析 / 成本搜尋（都透過 Supabase Edge Function 代理）
 // ============================================================
-const BASE_DOUGH_FLAVOR_ID = 'demo_original';
+const BASE_DOUGH_FLAVOR_ID = 'f1a079006fc9mqbk'; // 全麥原味貝體：使用者提供的基礎貝體標準配方
 async function getBaseDoughForAi(){
   try{
     const {data, error} = await sb.from('flavors').select('*').eq('id', BASE_DOUGH_FLAVOR_ID).maybeSingle();
