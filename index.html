@@ -1768,11 +1768,7 @@ async function importParsedFlavors(parsedFlavors){
   for(const pf of parsedFlavors){
     const id = uid();
     if(!firstNewId) firstNewId = id;
-    const flavorObj = hydrateFlavor({
-      id, name: pf.name || '未命名口味', items: [], servingRaw: Number(pf.servingRaw)||100, bakeLoss: 10,
-      note:'AI 解析匯入', ingredientsText:'', netWeight:0, netTolerance:10, shelfLife:'', storageMethod:'',
-      allergyNote:'', packageServings:1, category: pf.category||'', sortOrder: sortBase++
-    });
+    const items = [];
     for(const ing of (pf.items||[])){
       let dbEntry = db.find(d=>d.name===ing.name);
       if(!dbEntry){
@@ -1781,8 +1777,27 @@ async function importParsedFlavors(parsedFlavors){
         db.push(dbEntry);
         await dbSaveIngredient(dbEntry);
       }
-      flavorObj.items.push({ingredientId: dbEntry.id, grams: Number(ing.grams)||0, group: (ing.group||'').trim(), bakeAffected: ing.bakeAffected!==false});
+      items.push({ingredientId: dbEntry.id, grams: Number(ing.grams)||0, group: (ing.group||'').trim(), bakeAffected: ing.bakeAffected!==false});
     }
+    // AI 給的 servingRaw（即文件上的「分割N」）指的是貝體（麵團）本身一顆的生重，
+    // 但貝體的克重常常還是整批配方的量（例如套用基礎貝體差異寫法時），不會剛好等於分割數。
+    // 這裡把貝體部分等比例縮放到「分割N」克，再加上餡料克重，重新定義 servingRaw為
+    // 「一份成品的生重（貝體+餡料）」，這樣淨重／營養計算才會用正確的比例換算。
+    const doughItems = items.filter(it=>it.bakeAffected);
+    const fillingItems = items.filter(it=>!it.bakeAffected);
+    const doughTotal = doughItems.reduce((s,it)=>s+it.grams, 0);
+    const targetDough = Number(pf.servingRaw)||0;
+    if(doughTotal > 0 && targetDough > 0){
+      const scale = targetDough / doughTotal;
+      doughItems.forEach(it=>{ it.grams = Math.round(it.grams*scale*100)/100; });
+    }
+    const fillingTotal = fillingItems.reduce((s,it)=>s+it.grams, 0);
+    const finalServingRaw = (targetDough>0 ? targetDough : doughTotal) + fillingTotal;
+    const flavorObj = hydrateFlavor({
+      id, name: pf.name || '未命名口味', items, servingRaw: finalServingRaw || 100, bakeLoss: 10,
+      note:'AI 解析匯入', ingredientsText:'', netWeight:0, netTolerance:10, shelfLife:'', storageMethod:'',
+      allergyNote:'', packageServings:1, category: pf.category||'', sortOrder: sortBase++
+    });
     const ok = await dbInsertFlavor(flavorObj);
     if(ok) flavorIndex.push({id, name:flavorObj.name, category:flavorObj.category, sortOrder:flavorObj.sortOrder});
   }
