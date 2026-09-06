@@ -1701,6 +1701,23 @@ function setCostSearchStatus(msg){ const el = document.getElementById('cost-sear
 // ============================================================
 // AI：配方解析 / 成本搜尋（都透過 Supabase Edge Function 代理）
 // ============================================================
+const BASE_DOUGH_FLAVOR_ID = 'demo_original';
+async function getBaseDoughForAi(){
+  try{
+    const {data, error} = await sb.from('flavors').select('*').eq('id', BASE_DOUGH_FLAVOR_ID).maybeSingle();
+    if(error || !data) return null;
+    const f = flavorRowToModel(data);
+    return {
+      name: f.name,
+      servingRaw: f.servingRaw,
+      items: (f.items||[]).map(it=>({
+        name: (db.find(d=>d.id===it.ingredientId)||{}).name || it.ingredientId,
+        grams: it.grams, group: it.group||'', bakeAffected: it.bakeAffected!==false
+      }))
+    };
+  }catch(e){ console.error(e); return null; }
+}
+
 async function parseRecipeText(){
   const raw = document.getElementById('import-text').value.trim();
   if(!raw){ setImportStatus('請先貼上配方文字。'); return; }
@@ -1709,7 +1726,8 @@ async function parseRecipeText(){
     // 只把「常用/簡稱」原料名稱給AI參考，不含大量政府資料庫的正式學名，
     // 避免每次解析配方都要多送幾千字的原料清單、徒增花費又沒什麼幫助。
     const knownNames = db.filter(d=>!d.id.startsWith('tfnd_')).map(d=>d.name);
-    const data = await callAiProxy('parse-recipe', {rawText: raw, knownNames});
+    const baseDough = await getBaseDoughForAi();
+    const data = await callAiProxy('parse-recipe', {rawText: raw, knownNames, baseDough});
     const parsed = data.flavors;
     if(!Array.isArray(parsed) || parsed.length===0) throw new Error('AI沒有回傳任何口味');
     await importParsedFlavors(parsed);
@@ -1730,7 +1748,8 @@ async function parseRecipeFromUrl(){
   btn.disabled = true;
   try{
     const knownNames = db.filter(d=>!d.id.startsWith('tfnd_')).map(d=>d.name);
-    const data = await callAiProxy('fetch-recipe-url', {url, knownNames});
+    const baseDough = await getBaseDoughForAi();
+    const data = await callAiProxy('fetch-recipe-url', {url, knownNames, baseDough});
     const parsed = data.flavors;
     if(!Array.isArray(parsed) || parsed.length===0) throw new Error('AI沒有回傳任何口味');
     await importParsedFlavors(parsed);
