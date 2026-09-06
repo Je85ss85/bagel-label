@@ -2,6 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>貝果營養標示系統</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" crossorigin="anonymous">
@@ -136,6 +137,18 @@ window.DEFAULT_STAFF_PIN = "8888";
   .preset-dropdown{position:absolute;left:0;right:0;top:100%;z-index:50;background:#fff;border:1px solid var(--rule-strong);border-radius:6px;margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,0.12);overflow:hidden;}
   .preset-option{padding:7px 10px;font-size:12px;cursor:pointer;color:var(--ink);}
   .preset-option:hover{background:var(--wheat-soft);}
+  @media (max-width: 860px){
+    .app{grid-template-columns:1fr;}
+    .sidebar{max-height:45vh;}
+    .flavor-list{max-height:none;}
+    .main{padding:16px;max-width:100%;}
+    .grid2{grid-template-columns:1fr;gap:20px;}
+    .meta-grid{grid-template-columns:1fr 1fr;}
+    .top-row{flex-wrap:wrap;}
+    .actions{flex-wrap:wrap;}
+    input, textarea, select, button{font-size:16px;}
+    .db-row, .db-head{font-size:11px;}
+  }
 </style>
 </head>
 <body>
@@ -1054,15 +1067,23 @@ function renderMain(){
         <div class="section-title">匯入配方（懶得一項項手動輸入？貼上文字讓AI幫你拆解，可一次貼多款口味）</div>
         <div class="panel">
           <textarea id="import-text" placeholder="把配方文字貼在這裡，可以包含多款口味、多層酵種（母種／酸液種／老麵等）。" style="min-height:120px;"></textarea>
-          <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
+          <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;">
             <button class="btn primary" id="parse-import-btn">AI 解析並加入口味</button>
             <span id="import-status" style="font-size:12px;color:var(--ink-soft);"></span>
+          </div>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--rule);">
+            <label style="font-size:12px;color:var(--ink-soft);">或者懶得複製貼上？貼上公開連結（例如 Google文件的分享連結，記得先設成「知道連結的任何人」都能檢視），我幫你打開來看：</label>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+              <input type="text" id="import-url" placeholder="https://docs.google.com/document/d/..." style="flex:1;min-width:220px;">
+              <button class="btn primary" id="parse-import-url-btn">抓取並解析</button>
+            </div>
+            <span id="import-url-status" style="font-size:12px;color:var(--ink-soft);"></span>
           </div>
         </div>
 
         <div class="section-title">配方原料（已拆解完成的最終克重）</div>
         <div class="panel">
-          <div id="item-rows"></div>
+          <div id="item-rows" style="overflow-x:auto;"></div>
           <button class="add-item-btn" id="add-item-btn">＋ 新增原料</button>
           <div class="totalrow"><span>生麵團總重</span><span id="total-raw-display">${round(calc.totalRaw,1)} 公克</span></div>
         </div>
@@ -1117,7 +1138,7 @@ function renderMain(){
           </div>
           <div class="db-scroll">
             <div class="db-head"><span>原料</span><span>熱量</span><span>蛋白</span><span>脂肪</span><span>飽和</span><span>反式</span><span>碳水</span><span>糖</span><span>纖維</span><span>成本</span><span></span><span></span></div>
-            <div id="db-rows" style="max-height:340px;overflow-y:auto;"></div>
+            <div id="db-rows" style="max-height:340px;overflow-y:auto;overflow-x:auto;"></div>
           </div>
           <div style="display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;">
             <button class="add-item-btn" id="add-db-btn">＋ 新增原料至資料庫</button>
@@ -1355,6 +1376,7 @@ function renderMain(){
   });
   document.getElementById('download-jpg-btn').addEventListener('click', downloadJpg);
   document.getElementById('parse-import-btn').addEventListener('click', parseRecipeText);
+  document.getElementById('parse-import-url-btn').addEventListener('click', parseRecipeFromUrl);
   document.getElementById('batch-download-btn').addEventListener('click', ()=>{
     showFlavorPickerModal();
   });
@@ -1697,6 +1719,28 @@ async function parseRecipeText(){
     console.error(e);
     setImportStatus('解析失敗：' + (e.message||e) + '（配方太長可能被截斷，可以試著一次貼少一點口味分批匯入）');
   }
+}
+
+async function parseRecipeFromUrl(){
+  const url = document.getElementById('import-url').value.trim();
+  const statusEl = document.getElementById('import-url-status');
+  if(!url){ statusEl.textContent = '請先貼上連結。'; return; }
+  statusEl.textContent = '抓取並解析中，請稍候…（要開URL的公開頁面再交給AI看，比貼文字慢一點）';
+  const btn = document.getElementById('parse-import-url-btn');
+  btn.disabled = true;
+  try{
+    const knownNames = db.filter(d=>!d.id.startsWith('tfnd_')).map(d=>d.name);
+    const data = await callAiProxy('fetch-recipe-url', {url, knownNames});
+    const parsed = data.flavors;
+    if(!Array.isArray(parsed) || parsed.length===0) throw new Error('AI沒有回傳任何口味');
+    await importParsedFlavors(parsed);
+    statusEl.textContent = `已匯入 ${parsed.length} 個口味 ✓ 新原料若營養值為0，請至下方資料庫補上實際數值。`;
+    document.getElementById('import-url').value = '';
+  }catch(e){
+    console.error(e);
+    statusEl.textContent = '抓取失敗：' + (e.message||e);
+  }
+  btn.disabled = false;
 }
 
 async function importParsedFlavors(parsedFlavors){
