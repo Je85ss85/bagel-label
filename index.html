@@ -1912,9 +1912,7 @@ async function batchDownloadPdf(selectedIds){
       const imgH = imgW * (canvas.height / canvas.width);
       if(!pdf){ pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'}); }
       else { pdf.addPage(); }
-      pdf.setFontSize(11);
-      pdf.text(activeFlavor.name || '', margin, margin);
-      pdf.addImage(imgData, 'JPEG', margin, margin+6, imgW, imgH);
+      pdf.addImage(imgData, 'JPEG', margin, margin, imgW, imgH);
     }
     if(pdf) pdf.save('全部口味營養標示.pdf');
     setImportStatus('PDF 匯出完成 ✓');
