@@ -579,8 +579,8 @@ function suggestIngredientsTextAny(flavor){
     : suggestIngredientsText(flavor);
 }
 
-const FLOUR_IDS = new Set(['hg_flour','bread_flour','ap_flour','cake_flour','whole_wheat','rye_flour','buckwheat','rice_flour']);
-const WHOLE_GRAIN_IDS = new Set(['whole_wheat','rye_flour','buckwheat']);
+const FLOUR_IDS = new Set(['hg_flour','bread_flour','ap_flour','cake_flour','whole_wheat','rye_flour','buckwheat','rice_flour','tfnd_A0320404','tfnd_A0320505']);
+const WHOLE_GRAIN_IDS = new Set(['whole_wheat','rye_flour','buckwheat','tfnd_A0320505']);
 const DAIRY_IDS = new Set(['milk','milk_powder','heavy_cream','cream_cheese','greek_yogurt','cheddar','mozzarella','butter','ghee','coconut_milk','coconut_cream_powder',
   'ing1a078f20eed562','ing1a078f20eed7o2','ing1a078f20eedhtu','ing1a078f20eedwec','ing1a078f20eedzpe','ing1a078f20ef1n3h','ing1a078f20ef223h','ingmtpvb16eq60']);
 const EGG_IDS = new Set(['egg_whole','egg_yolk','egg_white','drv_31afb19838','ing1a078f20eed4wl','ing1a078f20eef30x']);
@@ -914,49 +914,54 @@ function calcWholeGrainRatio(flavor){
 }
 
 // ------------------------------------------------------------
-// 健康評級：改用固定門檻的簡化版 Nutri-Score，不再跟你目前庫裡
-// 有幾款口味、彼此分數怎麼分布有關 —— 同一款口味的評級不會因為
-// 你新增/刪除其他口味而改變，門檻本身也有公開依據可以參考。
-// 限制：官方 Nutri-Score 還會計入蔬果/堅果/豆類比例，這裡沒有
-// 追蹤這項資料，所以是簡化版，僅供內部參考、不是官方認證分數。
+// 貝果專屬健康評級：取代通用 Nutri-Score。Nutri-Score 的門檻是拿
+// 汽水/洋芋片那種全食品光譜校準的，貝果不管做得多健康都很難拉到
+// 好評級，而且完全沒看「全穀比例」——這對麵包類產品是關鍵指標。
+// 改成抓5個面向、各打0-4分（滿分20），門檻用店裡實際口味的糖／
+// 蛋白質／飽和脂肪／鈉／全穀比例分布校準過，甜口味的糖門檻放寬
+// （本來就該有點甜），全穀比例跟蛋白質同等重要。僅供內部參考。
 // ------------------------------------------------------------
-const NUTRISCORE_ENERGY_KJ = [335,670,1005,1340,1675,2010,2345,2680,3015,3350];
-const NUTRISCORE_SUGAR_G   = [4.5,9,13.5,18,22.5,27,31,36,40,45];
-const NUTRISCORE_SATFAT_G  = [1,2,3,4,5,6,7,8,9,10];
-const NUTRISCORE_SODIUM_MG = [90,180,270,360,450,540,630,720,810,900];
-const NUTRISCORE_FIBER_G   = [0.9,1.9,2.8,3.7,4.7];
-const NUTRISCORE_PROTEIN_G = [1.6,3.2,4.8,6.4,8.0];
+const BAGEL_SUGAR_THRESHOLDS = {
+  '甜口味': [5,9,13,17],
+  '空貝': [3,6,9,12],
+  '鹹口味': [3,6,9,12],
+  'default': [4,7,11,15],
+};
+const BAGEL_SATFAT_THRESHOLDS = [2,4,6,8];
+const BAGEL_SODIUM_THRESHOLDS = [250,350,450,600];
+const BAGEL_PROTEIN_THRESHOLDS = [4,6,8,10];
+const BAGEL_WHOLEGRAIN_THRESHOLDS = [0.05,0.10,0.20,0.30];
 
-function bandPoints(value, thresholds){
-  for(let i=0;i<thresholds.length;i++){ if(value<=thresholds[i]) return i; }
-  return thresholds.length;
+function bandScoreLowerBetter(value, thresholds){
+  for(let i=0;i<thresholds.length;i++){ if(value<=thresholds[i]) return 4-i; }
+  return 0;
+}
+function bandScoreHigherBetter(value, thresholds){
+  let score = 0;
+  for(let i=0;i<thresholds.length;i++){ if(value>=thresholds[i]) score = i+1; }
+  return score;
 }
 
-function calcNutriScore(per100g){
-  const energyKJ = (per100g.kcal||0) * 4.184;
-  const negative =
-    bandPoints(energyKJ, NUTRISCORE_ENERGY_KJ) +
-    bandPoints(per100g.sugar||0, NUTRISCORE_SUGAR_G) +
-    bandPoints(per100g.satfat||0, NUTRISCORE_SATFAT_G) +
-    bandPoints(per100g.sodium||0, NUTRISCORE_SODIUM_MG);
-  let fiberPts = bandPoints(per100g.fiber||0, NUTRISCORE_FIBER_G);
-  let proteinPts = bandPoints(per100g.protein||0, NUTRISCORE_PROTEIN_G);
-  // 官方規則：負分>=11時，蛋白質加分要蔬果比例>80%才能算，這裡沒追蹤蔬果比例，保守設為0
-  if(negative >= 11 && proteinPts > 0){ proteinPts = 0; }
-  const positive = fiberPts + proteinPts;
-  const score = negative - positive;
+function calcBagelHealthScore(flavor, per100g){
+  const sugarT = BAGEL_SUGAR_THRESHOLDS[flavor.category] || BAGEL_SUGAR_THRESHOLDS['default'];
+  const wholeGrainRatio = calcWholeGrainRatio(flavor);
+  const sSugar = bandScoreLowerBetter(per100g.sugar||0, sugarT);
+  const sSatfat = bandScoreLowerBetter(per100g.satfat||0, BAGEL_SATFAT_THRESHOLDS);
+  const sSodium = bandScoreLowerBetter(per100g.sodium||0, BAGEL_SODIUM_THRESHOLDS);
+  const sProtein = bandScoreHigherBetter(per100g.protein||0, BAGEL_PROTEIN_THRESHOLDS);
+  const sWholeGrain = bandScoreHigherBetter(wholeGrainRatio, BAGEL_WHOLEGRAIN_THRESHOLDS);
+  const total = sSugar + sSatfat + sSodium + sProtein + sWholeGrain;
   let grade;
-  if(score <= -1) grade = 'A';
-  else if(score <= 2) grade = 'B';
-  else if(score <= 10) grade = 'C';
-  else if(score <= 18) grade = 'D';
+  if(total>=16) grade = 'A';
+  else if(total>=12) grade = 'B';
+  else if(total>=8) grade = 'C';
+  else if(total>=4) grade = 'D';
   else grade = 'E';
-  return {score, grade, negative, positive, fiberPts, proteinPts};
+  return {total, grade, sSugar, sSatfat, sSodium, sProtein, sWholeGrain, wholeGrainRatio};
 }
 
 function healthGradeHtml(flavor, per100g){
-  const ns = calcNutriScore(per100g);
-  const wholeGrainRatio = calcWholeGrainRatio(flavor);
+  const hs = calcBagelHealthScore(flavor, per100g);
   const letters = ['A','B','C','D','E'];
   const colors = {A:'#1B7A3D', B:'#84BD3C', C:'#F5C623', D:'#F0932B', E:'#D9432E'};
   return `
@@ -964,13 +969,13 @@ function healthGradeHtml(flavor, per100g){
       <div style="display:flex;gap:1px;">
         ${letters.map(l=>`<div style="flex:1;text-align:center;font-family:'Noto Sans TC',sans-serif;font-weight:700;
           background:${colors[l]};color:#fff;
-          font-size:${l===ns.grade?'9px':'6.5px'};
-          padding:${l===ns.grade?'2px 0':'1.5px 0'};
-          opacity:${l===ns.grade?'1':'0.35'};
-          transform:${l===ns.grade?'scale(1.1)':'scale(1)'};
+          font-size:${l===hs.grade?'9px':'6.5px'};
+          padding:${l===hs.grade?'2px 0':'1.5px 0'};
+          opacity:${l===hs.grade?'1':'0.35'};
+          transform:${l===hs.grade?'scale(1.1)':'scale(1)'};
           border-radius:2px;">${l}</div>`).join('')}
       </div>
-      <div style="font-size:6px;color:var(--ink-soft);margin-top:2px;text-align:center;">簡化版 Nutri-Score（未計入蔬果堅果比例），僅供內部參考${wholeGrainRatio>0?`｜全穀比例 ${Math.round(wholeGrainRatio*100)}%`:''}</div>
+      <div style="font-size:6px;color:var(--ink-soft);margin-top:2px;text-align:center;">貝果專屬健康評級（糖/飽和脂肪/鈉/蛋白質/全穀比例），僅供內部參考｜全穀比例 ${Math.round(hs.wholeGrainRatio*100)}%</div>
     </div>`;
 }
 
