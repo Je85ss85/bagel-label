@@ -123,16 +123,18 @@ window.DEFAULT_STAFF_PIN = "8888";
   .nutri-table tr.indent td:first-child{padding-left:8px;}
   .nutri-table tr:last-child td{border-bottom:1px solid var(--ink);}
 
-  /* ---------- 精簡版標籤（給小尺寸標籤機用，原生尺寸就接近8x6cm，字級不用再被壓縮） ---------- */
-  .cl-wrap{width:300px;box-sizing:border-box;background:#fff;border:1.5px solid var(--ink);border-radius:4px;padding:8px 10px;font-family:'Noto Sans TC',sans-serif;color:var(--ink);}
-  .cl-title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:4px;line-height:1.2;}
-  .cl-line{font-size:10px;margin:2px 0;line-height:1.3;}
+  /* ---------- 精簡版標籤（橫式雙欄，給8x6cm這種寬>高的標籤用，
+     左欄放文字說明、右欄放營養標示表，比全部上下疊放省高度） ---------- */
+  .cl-wrap{width:340px;box-sizing:border-box;background:#fff;border:1.5px solid var(--ink);border-radius:4px;padding:7px 9px;font-family:'Noto Sans TC',sans-serif;color:var(--ink);display:grid;grid-template-columns:1fr 110px;gap:8px;}
+  .cl-left{min-width:0;}
+  .cl-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:4px;line-height:1.2;}
+  .cl-line{font-size:9.5px;margin:2px 0;line-height:1.3;}
   .cl-line b{font-weight:700;}
-  .cl-ingredients{font-size:10px;line-height:1.35;margin:3px 0 5px;}
+  .cl-ingredients{font-size:9.5px;line-height:1.3;margin:3px 0 5px;}
   .cl-ingredients b{font-weight:700;}
-  .cl-allergy{font-size:9.5px;line-height:1.35;margin-top:4px;font-weight:600;}
-  .cl-nutri{margin-top:6px;}
-  .cl-footer{font-size:8.5px;color:var(--ink-soft);margin-top:5px;border-top:1px solid var(--rule);padding-top:4px;}
+  .cl-allergy{font-size:9px;line-height:1.3;margin-top:4px;font-weight:600;}
+  .cl-right{display:flex;flex-direction:column;}
+  .cl-footer{font-size:8px;color:var(--ink-soft);margin-top:6px;padding-top:4px;border-top:1px solid var(--rule);grid-column:1/-1;}
   .nutri-foot{font-size:9px;color:var(--ink-soft);margin-top:8px;font-family:'Noto Sans TC',sans-serif;}
   .flavor-list::-webkit-scrollbar{width:5px;}
   .flavor-list::-webkit-scrollbar-thumb{background:#7A6248;border-radius:3px;}
@@ -1079,16 +1081,18 @@ function compactLabelHtml(flavor, calc){
   const footerParts = [brand.brandName, brand.contactEmail, brand.igHandle?('IG '+brand.igHandle):''].filter(Boolean).map(escapeHtml);
   return `
     <div class="cl-wrap">
-      <div class="cl-title">${escapeHtml(flavor.name)} ${dietTagHtml(flavor)}</div>
-      ${ingredientsHtml}
-      <div class="cl-line"><b>內容量：</b>${flavor.netWeight||0}${flavor.netTolerance?('±'+flavor.netTolerance):''}克</div>
-      <div class="cl-line"><b>保存期限：</b>${escapeHtml(flavor.shelfLife||'')}</div>
-      <div class="cl-line"><b>製造日期：</b>${escapeHtml(flavor.manufactureDate||'')}</div>
-      <div class="cl-line"><b>有效日期：</b>${escapeHtml(flavor.expiryDate||'')}</div>
-      <div class="cl-line"><b>保存方式：</b>${escapeHtml(flavor.storageMethod||'')}</div>
-      ${originLine}
-      <div class="cl-allergy">${[escapeHtml(flavor.allergyNote||''), brand.generalNotice?escapeHtml(brand.generalNotice):''].filter(Boolean).join(' ')}</div>
-      <div class="cl-nutri">${nutriTableHtml(flavor, calc)}</div>
+      <div class="cl-left">
+        <div class="cl-title">${escapeHtml(flavor.name)} ${dietTagHtml(flavor)}</div>
+        ${ingredientsHtml}
+        <div class="cl-line"><b>內容量：</b>${flavor.netWeight||0}${flavor.netTolerance?('±'+flavor.netTolerance):''}克</div>
+        <div class="cl-line"><b>保存期限：</b>${escapeHtml(flavor.shelfLife||'')}</div>
+        <div class="cl-line"><b>製造日期：</b>${escapeHtml(flavor.manufactureDate||'')}</div>
+        <div class="cl-line"><b>有效日期：</b>${escapeHtml(flavor.expiryDate||'')}</div>
+        <div class="cl-line"><b>保存方式：</b>${escapeHtml(flavor.storageMethod||'')}</div>
+        ${originLine}
+        <div class="cl-allergy">${[escapeHtml(flavor.allergyNote||''), brand.generalNotice?escapeHtml(brand.generalNotice):''].filter(Boolean).join(' ')}</div>
+      </div>
+      <div class="cl-right">${nutriTableHtml(flavor, calc)}</div>
       ${footerParts.length ? `<div class="cl-footer">${footerParts.join(' ｜ ')}</div>` : ''}
     </div>`;
 }
