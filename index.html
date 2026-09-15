@@ -1110,6 +1110,7 @@ function renderMain(){
       <div class="actions">
         <button class="btn" id="batch-download-btn">批次JPG</button>
         <button class="btn" id="batch-pdf-btn">批次PDF</button>
+        <button class="btn" id="export-csv-btn" title="匯出全部口味的文字資料成CSV，給標籤機APP的文字範本／批量列印功能用，印出來是真正的文字，不會模糊">匯出CSV（給標籤機文字範本）</button>
         <button class="btn" id="download-jpg-btn">下載 JPG</button>
         <button class="btn" id="download-print-label-btn" title="專門給標籤機用的高解析度PNG，不會模糊；列印尺寸可以在下面「品牌設定」裡調整">標籤機列印版</button>
         <button class="btn" id="download-thermal-label-btn" title="給精臣K3這類熱感印表機用，去掉灰階抗鋸齒邊緣，文字比較不會糊">熱感印表機專用版</button>
@@ -1454,6 +1455,7 @@ function renderMain(){
   document.getElementById('batch-pdf-btn').addEventListener('click', ()=>{
     showFlavorPickerModal();
   });
+  document.getElementById('export-csv-btn').addEventListener('click', exportAllFlavorsCsv);
 }
 
 function showFlavorPickerModal(){
@@ -2127,6 +2129,62 @@ async function downloadCompactThermalLabel(){
     console.error('compact thermal label export failed', e);
     alert2('精簡熱感印表機版匯出失敗：' + (e.message||e));
   }
+}
+
+// 圖片再怎麼調都是點陣圖，印表機遇到抗鋸齒灰邊就是會糊。真正繞開這個問題的
+// 方法是印「文字」而不是印「圖」——匯出成CSV，之後在標籤機APP（例如精臣）
+// 裡做一個文字版型、欄位對應這裡的表頭，用APP的批量列印/Excel匯入功能，
+// 印出來的每個字都是印表機自己的字型引擎現畫的，不會有解析度不夠的問題。
+function csvField(v){
+  const s = String(v==null?'':v).replace(/\r?\n/g, ' ').trim();
+  if(/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+async function exportAllFlavorsCsv(){
+  const btn = document.getElementById('export-csv-btn');
+  if(btn) btn.disabled = true;
+  setImportStatus('匯出CSV中…');
+  try{
+    const headers = [
+      '口味名稱','葷素標示','成分','內容量(克)','保存期限','製造日期','有效日期','保存方式','產地',
+      '過敏原標示','製造商','聯絡信箱','IG',
+      '每份重量(克)',
+      '熱量_每份(大卡)','蛋白質_每份(克)','脂肪_每份(克)','飽和脂肪_每份(克)','反式脂肪_每份(克)','碳水化合物_每份(克)','糖_每份(克)','鈉_每份(毫克)',
+      '熱量_每100克(大卡)','蛋白質_每100克(克)','脂肪_每100克(克)','飽和脂肪_每100克(克)','反式脂肪_每100克(克)','碳水化合物_每100克(克)','糖_每100克(克)','鈉_每100克(毫克)'
+    ];
+    const rows = [headers];
+    for(let i=0;i<flavorIndex.length;i++){
+      const idx = flavorIndex[i];
+      setImportStatus(`匯出CSV中…（${i+1}/${flavorIndex.length}）`);
+      const f = (idx.id === activeId) ? activeFlavor : hydrateFlavor(await dbLoadFlavor(idx.id));
+      if(!f) continue;
+      const calc = calcLabel(f);
+      const tag = calcDietTag(f);
+      const p = calc.perServing, h = calc.per100Baked;
+      rows.push([
+        f.name, tag.label, f.ingredientsText||'', f.netWeight||0, f.shelfLife||'', f.manufactureDate||'', f.expiryDate||'', f.storageMethod||'', f.originText||'',
+        f.allergyNote||'', brand.brandName||'', brand.contactEmail||'', brand.igHandle||'',
+        round(calc.servingBaked,1),
+        fmt(p.kcal,'int'), fmt(p.protein,'dec1'), fmt(p.fat,'dec1'), fmt(p.satfat,'dec1'), fmt(p.transfat,'dec1'), fmt(p.carb,'dec1'), fmt(p.sugar,'dec1'), fmt(p.sodium,'int'),
+        fmt(h.kcal,'int'), fmt(h.protein,'dec1'), fmt(h.fat,'dec1'), fmt(h.satfat,'dec1'), fmt(h.transfat,'dec1'), fmt(h.carb,'dec1'), fmt(h.sugar,'dec1'), fmt(h.sodium,'int')
+      ].map(csvField));
+    }
+    const csvText = '﻿' + rows.map(r=>r.join(',')).join('\r\n');
+    const blob = new Blob([csvText], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = '全部口味標籤資料.csv';
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setImportStatus(`CSV匯出完成 ✓ 共 ${flavorIndex.length} 款口味`);
+  }catch(e){
+    console.error('csv export failed', e);
+    setImportStatus('CSV匯出失敗：' + (e.message||e));
+  }
+  if(btn) btn.disabled = false;
 }
 
 init();
