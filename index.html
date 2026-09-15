@@ -1064,6 +1064,7 @@ function renderMain(){
         <button class="btn" id="batch-download-btn">批次JPG</button>
         <button class="btn" id="batch-pdf-btn">批次PDF</button>
         <button class="btn" id="download-jpg-btn">下載 JPG</button>
+        <button class="btn" id="download-print-label-btn" title="專門給標籤機用，8×6公分高解析度PNG，不會模糊">標籤機列印版(8×6cm)</button>
         <button class="btn primary" id="save-btn">儲存</button>
       </div>
     </div>
@@ -1381,6 +1382,7 @@ function renderMain(){
     btn.textContent = ok ? '已儲存 ✓' : '儲存失敗'; setTimeout(()=>{ btn.textContent = old; }, 1400);
   });
   document.getElementById('download-jpg-btn').addEventListener('click', downloadJpg);
+  document.getElementById('download-print-label-btn').addEventListener('click', downloadLabelForPrinter);
   document.getElementById('parse-import-btn').addEventListener('click', parseRecipeText);
   document.getElementById('parse-import-url-btn').addEventListener('click', parseRecipeFromUrl);
   document.getElementById('batch-download-btn').addEventListener('click', ()=>{
@@ -1945,6 +1947,48 @@ async function downloadJpg(){
   }catch(e){
     console.error('JPG export failed', e);
     alert2('JPG匯出失敗：' + (e.message||e));
+  }
+}
+
+// 給標籤機用的版本：原本「下載JPG」是照電腦螢幕的排版尺寸截圖，
+// 貼到標籤機軟體裡設成8×6公分列印時，像素密度太低會被拉伸放大變模糊。
+// 這裡改成：先把整份標籤內容等比例縮放到剛好塞進8×6公分的畫布裡（不拉伸變形、不裁切），
+// 再用600 DPI（一般標籤機/雷射印表機清晰列印+可掃描的解析度）去截圖，
+// 存成PNG（無損，文字邊緣不會像JPEG那樣糊開）。
+async function downloadLabelForPrinter(){
+  if(!activeFlavor) return;
+  const calc = calcLabel(activeFlavor);
+  const CSS_PX_PER_CM = 96/2.54; // 瀏覽器CSS的參考基準：96px = 1英吋 = 2.54公分
+  const boxWpx = 8 * CSS_PX_PER_CM, boxHpx = 6 * CSS_PX_PER_CM;
+
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = `position:fixed;left:-9999px;top:0;width:${boxWpx}px;height:${boxHpx}px;background:#fff;overflow:hidden;box-sizing:border-box;display:flex;align-items:center;justify-content:center;`;
+  const inner = document.createElement('div');
+  inner.innerHTML = fullLabelHtml(activeFlavor, calc);
+  wrapper.appendChild(inner);
+  document.body.appendChild(wrapper);
+
+  try{
+    const rect = inner.getBoundingClientRect();
+    const fitScale = Math.min(boxWpx/rect.width, boxHpx/rect.height, 1);
+    inner.style.transformOrigin = 'center center';
+    inner.style.transform = `scale(${fitScale})`;
+
+    const PRINT_DPI = 600;
+    const renderScale = PRINT_DPI / 96;
+    const canvas = await html2canvas(wrapper, {backgroundColor:'#ffffff', scale: renderScale, useCORS:true, allowTaint:true, logging:false});
+    const dataUrl = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.download = (activeFlavor.name||'營養標示') + '_標籤機8x6cm_600dpi.png';
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }catch(e){
+    console.error('label printer export failed', e);
+    alert2('標籤機列印版匯出失敗：' + (e.message||e));
+  }finally{
+    document.body.removeChild(wrapper);
   }
 }
 
