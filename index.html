@@ -1065,6 +1065,7 @@ function renderMain(){
         <button class="btn" id="batch-pdf-btn">批次PDF</button>
         <button class="btn" id="download-jpg-btn">下載 JPG</button>
         <button class="btn" id="download-print-label-btn" title="專門給標籤機用的高解析度PNG，不會模糊；列印尺寸可以在下面「品牌設定」裡調整">標籤機列印版</button>
+        <button class="btn" id="download-thermal-label-btn" title="給精臣K3這類熱感印表機用，去掉灰階抗鋸齒邊緣，文字比較不會糊">熱感印表機專用版</button>
         <button class="btn primary" id="save-btn">儲存</button>
       </div>
     </div>
@@ -1395,6 +1396,7 @@ function renderMain(){
   });
   document.getElementById('download-jpg-btn').addEventListener('click', downloadJpg);
   document.getElementById('download-print-label-btn').addEventListener('click', downloadLabelForPrinter);
+  document.getElementById('download-thermal-label-btn').addEventListener('click', downloadLabelForThermalPrinter);
   document.getElementById('parse-import-btn').addEventListener('click', parseRecipeText);
   document.getElementById('parse-import-url-btn').addEventListener('click', parseRecipeFromUrl);
   document.getElementById('batch-download-btn').addEventListener('click', ()=>{
@@ -1979,13 +1981,29 @@ function setPrintLabelSizeCm(w, h){
   return v;
 }
 
+// 把畫布裡的每個像素都二值化成純黑或純白，去掉抗鋸齒留下的灰色邊緣。
+// 熱感印表機印不出真正的灰階，遇到灰邊會用網點去模擬，小字看起來就會糊糊、
+// 顆粒感很重——直接二值化之後，印表機拿到的每個點只有「印」或「不印」兩種
+// 選擇，沒有灰階可以誤判，文字邊緣反而會比較銳利。閾值刻意設得比中間值高一點
+// （190/255），讓偏灰的邊緣像素多半判定成黑色，效果是文字看起來會比較粗、
+// 比較實心，這對小字在低解析度印表機上的可讀性通常有幫助。
+function thresholdCanvasToBlackWhite(canvas, threshold){
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imgData.data;
+  for(let i=0;i<d.length;i+=4){
+    const luminance = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    const v = luminance < threshold ? 0 : 255;
+    d[i] = v; d[i+1] = v; d[i+2] = v;
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
 // 給標籤機用的版本：原本「下載JPG」是照電腦螢幕的排版尺寸截圖，
 // 貼到標籤機軟體裡設成實際公分數列印時，像素密度太低會被拉伸放大變模糊。
 // 這裡改成：先把整份標籤內容等比例縮放到剛好塞進設定的公分尺寸畫布裡（不拉伸變形、不裁切），
-// 再用600 DPI（一般標籤機/雷射印表機清晰列印+可掃描的解析度）去截圖，
-// 存成PNG（無損，文字邊緣不會像JPEG那樣糊開）。
-async function downloadLabelForPrinter(){
-  if(!activeFlavor) return;
+// 再用600 DPI（一般標籤機/雷射印表機清晰列印+可掃描的解析度）去截圖。
+async function renderLabelCanvas(){
   const calc = calcLabel(activeFlavor);
   const CSS_PX_PER_CM = 96/2.54; // 瀏覽器CSS的參考基準：96px = 1英吋 = 2.54公分
   const size = getPrintLabelSizeCm();
@@ -2007,18 +2025,44 @@ async function downloadLabelForPrinter(){
     const PRINT_DPI = 600;
     const renderScale = PRINT_DPI / 96;
     const canvas = await html2canvas(wrapper, {backgroundColor:'#ffffff', scale: renderScale, useCORS:true, allowTaint:true, logging:false});
-    const dataUrl = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.download = (activeFlavor.name||'營養標示') + `_標籤機${size.w}x${size.h}cm_600dpi.png`;
-    link.href = dataUrl;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    return {canvas, size};
+  }finally{
+    document.body.removeChild(wrapper);
+  }
+}
+
+function downloadCanvasAsPng(canvas, filename){
+  const dataUrl = canvas.toDataURL('image/png');
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = dataUrl;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+async function downloadLabelForPrinter(){
+  if(!activeFlavor) return;
+  try{
+    const {canvas, size} = await renderLabelCanvas();
+    downloadCanvasAsPng(canvas, (activeFlavor.name||'營養標示') + `_標籤機${size.w}x${size.h}cm_600dpi.png`);
   }catch(e){
     console.error('label printer export failed', e);
     alert2('標籤機列印版匯出失敗：' + (e.message||e));
-  }finally{
-    document.body.removeChild(wrapper);
+  }
+}
+
+// 熱感印表機專用版：跟上面同一份畫布，但多一道二值化，去掉灰階抗鋸齒邊緣，
+// 給像精臣K3這類熱感式印表機用（印不出真灰階、遇到灰邊容易糊）。
+async function downloadLabelForThermalPrinter(){
+  if(!activeFlavor) return;
+  try{
+    const {canvas, size} = await renderLabelCanvas();
+    thresholdCanvasToBlackWhite(canvas, 190);
+    downloadCanvasAsPng(canvas, (activeFlavor.name||'營養標示') + `_熱感印表機${size.w}x${size.h}cm_黑白.png`);
+  }catch(e){
+    console.error('thermal label export failed', e);
+    alert2('熱感印表機專用版匯出失敗：' + (e.message||e));
   }
 }
 
