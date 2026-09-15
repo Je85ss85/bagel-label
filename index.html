@@ -1064,7 +1064,7 @@ function renderMain(){
         <button class="btn" id="batch-download-btn">批次JPG</button>
         <button class="btn" id="batch-pdf-btn">批次PDF</button>
         <button class="btn" id="download-jpg-btn">下載 JPG</button>
-        <button class="btn" id="download-print-label-btn" title="專門給標籤機用，8×6公分高解析度PNG，不會模糊">標籤機列印版(8×6cm)</button>
+        <button class="btn" id="download-print-label-btn" title="專門給標籤機用的高解析度PNG，不會模糊；列印尺寸可以在下面「品牌設定」裡調整">標籤機列印版</button>
         <button class="btn primary" id="save-btn">儲存</button>
       </div>
     </div>
@@ -1197,6 +1197,12 @@ function renderMain(){
           </div>
           <div class="field"><label>標籤縮放（${brand.labelScale||100}%）</label>
             <input type="range" id="label-scale" min="60" max="150" step="5" value="${brand.labelScale||100}">
+          </div>
+          <div class="field"><label>標籤機列印尺寸（公分，寬×高。這台電腦接的標籤機/貼紙用這個設定，不會跟其他裝置同步）</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="number" id="print-label-w" min="1" max="30" step="0.1" value="${getPrintLabelSizeCm().w}" style="width:70px;"> ×
+              <input type="number" id="print-label-h" min="1" max="30" step="0.1" value="${getPrintLabelSizeCm().h}" style="width:70px;"> cm
+            </div>
           </div>
         </div>
 
@@ -1355,6 +1361,12 @@ function renderMain(){
     refreshLabel();
     const scaleLabel = document.querySelector('#label-scale').previousElementSibling;
     if(scaleLabel) scaleLabel.textContent = `標籤縮放（${brand.labelScale}%）`;
+  });
+  document.getElementById('print-label-w').addEventListener('input', e=>{
+    setPrintLabelSizeCm(Number(e.target.value)||8, getPrintLabelSizeCm().h);
+  });
+  document.getElementById('print-label-h').addEventListener('input', e=>{
+    setPrintLabelSizeCm(getPrintLabelSizeCm().w, Number(e.target.value)||6);
   });
 
   document.getElementById('db-search').addEventListener('input', e=>{ dbSearchQuery = e.target.value; renderDbRows(); });
@@ -1950,16 +1962,34 @@ async function downloadJpg(){
   }
 }
 
+// 標籤機的列印尺寸存在這台電腦的 localStorage，不跟 Supabase 同步——
+// 因為這是「這台電腦接的這台印表機、目前用的這款貼紙」的實體規格，本來就
+// 該跟著裝置走，不是跟著品牌帳號走（換一台電腦、換一種貼紙尺寸很正常）。
+const PRINT_LABEL_SIZE_KEY = 'bagel_print_label_size_cm';
+function getPrintLabelSizeCm(){
+  try{
+    const raw = localStorage.getItem(PRINT_LABEL_SIZE_KEY);
+    if(raw){ const v = JSON.parse(raw); if(v && v.w>0 && v.h>0) return v; }
+  }catch(e){}
+  return {w:8, h:6};
+}
+function setPrintLabelSizeCm(w, h){
+  const v = {w: Math.max(1, Number(w)||8), h: Math.max(1, Number(h)||6)};
+  try{ localStorage.setItem(PRINT_LABEL_SIZE_KEY, JSON.stringify(v)); }catch(e){}
+  return v;
+}
+
 // 給標籤機用的版本：原本「下載JPG」是照電腦螢幕的排版尺寸截圖，
-// 貼到標籤機軟體裡設成8×6公分列印時，像素密度太低會被拉伸放大變模糊。
-// 這裡改成：先把整份標籤內容等比例縮放到剛好塞進8×6公分的畫布裡（不拉伸變形、不裁切），
+// 貼到標籤機軟體裡設成實際公分數列印時，像素密度太低會被拉伸放大變模糊。
+// 這裡改成：先把整份標籤內容等比例縮放到剛好塞進設定的公分尺寸畫布裡（不拉伸變形、不裁切），
 // 再用600 DPI（一般標籤機/雷射印表機清晰列印+可掃描的解析度）去截圖，
 // 存成PNG（無損，文字邊緣不會像JPEG那樣糊開）。
 async function downloadLabelForPrinter(){
   if(!activeFlavor) return;
   const calc = calcLabel(activeFlavor);
   const CSS_PX_PER_CM = 96/2.54; // 瀏覽器CSS的參考基準：96px = 1英吋 = 2.54公分
-  const boxWpx = 8 * CSS_PX_PER_CM, boxHpx = 6 * CSS_PX_PER_CM;
+  const size = getPrintLabelSizeCm();
+  const boxWpx = size.w * CSS_PX_PER_CM, boxHpx = size.h * CSS_PX_PER_CM;
 
   const wrapper = document.createElement('div');
   wrapper.style.cssText = `position:fixed;left:-9999px;top:0;width:${boxWpx}px;height:${boxHpx}px;background:#fff;overflow:hidden;box-sizing:border-box;display:flex;align-items:center;justify-content:center;`;
@@ -1979,7 +2009,7 @@ async function downloadLabelForPrinter(){
     const canvas = await html2canvas(wrapper, {backgroundColor:'#ffffff', scale: renderScale, useCORS:true, allowTaint:true, logging:false});
     const dataUrl = canvas.toDataURL('image/png');
     const link = document.createElement('a');
-    link.download = (activeFlavor.name||'營養標示') + '_標籤機8x6cm_600dpi.png';
+    link.download = (activeFlavor.name||'營養標示') + `_標籤機${size.w}x${size.h}cm_600dpi.png`;
     link.href = dataUrl;
     document.body.appendChild(link);
     link.click();
