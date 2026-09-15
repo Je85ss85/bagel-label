@@ -1111,7 +1111,7 @@ function renderMain(){
       <div class="actions">
         <button class="btn" id="batch-download-btn">批次JPG</button>
         <button class="btn" id="batch-pdf-btn">批次PDF</button>
-        <button class="btn" id="export-csv-btn" title="匯出全部口味的文字資料成CSV，給標籤機APP的文字範本／批量列印功能用，印出來是真正的文字，不會模糊">匯出CSV（給標籤機文字範本）</button>
+        <button class="btn" id="export-csv-btn" title="可以勾選要匯出哪幾款口味，給標籤機APP的文字範本／批量列印功能用，印出來是真正的文字，不會模糊">匯出CSV（給標籤機文字範本）</button>
         <button class="btn" id="download-jpg-btn">下載 JPG</button>
         <button class="btn" id="download-print-label-btn" title="專門給標籤機用的高解析度PNG，不會模糊；列印尺寸可以在下面「品牌設定」裡調整">標籤機列印版</button>
         <button class="btn" id="download-thermal-label-btn" title="給精臣K3這類熱感印表機用，去掉灰階抗鋸齒邊緣，文字比較不會糊">熱感印表機專用版</button>
@@ -1456,7 +1456,7 @@ function renderMain(){
   document.getElementById('batch-pdf-btn').addEventListener('click', ()=>{
     showFlavorPickerModal();
   });
-  document.getElementById('export-csv-btn').addEventListener('click', exportAllFlavorsCsv);
+  document.getElementById('export-csv-btn').addEventListener('click', showFlavorPickerModal);
 }
 
 function showFlavorPickerModal(){
@@ -1466,7 +1466,7 @@ function showFlavorPickerModal(){
   overlay.innerHTML = `
     <div style="background:#fff;padding:24px;border-radius:10px;width:420px;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;">
       <div style="font-family:'Roboto Slab',serif;font-weight:700;font-size:16px;margin-bottom:4px;color:var(--ink);">選擇要匯出的口味</div>
-      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">勾選之後，下面可以選擇匯出成批次 JPG 或批次 PDF</div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">勾選之後，下面可以選擇匯出成批次 JPG、批次 PDF，或CSV文字資料</div>
       <div style="margin-bottom:8px;display:flex;gap:12px;">
         <button type="button" id="fp-select-all" class="btn" style="font-size:11px;padding:4px 10px;">全選</button>
         <button type="button" id="fp-select-none" class="btn" style="font-size:11px;padding:4px 10px;">取消全選</button>
@@ -1482,6 +1482,7 @@ function showFlavorPickerModal(){
         <button type="button" id="fp-cancel" class="btn" style="font-size:12px;">取消</button>
         <button type="button" id="fp-jpg" class="btn primary" style="font-size:12px;">匯出 JPG</button>
         <button type="button" id="fp-pdf" class="btn primary" style="font-size:12px;">匯出 PDF</button>
+        <button type="button" id="fp-csv" class="btn primary" style="font-size:12px;">匯出 CSV</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -1506,6 +1507,12 @@ function showFlavorPickerModal(){
     document.body.removeChild(overlay);
     if(ids.length===0){ alert2('至少要選一個口味'); return; }
     await batchDownloadPdf(ids);
+  });
+  overlay.querySelector('#fp-csv').addEventListener('click', async ()=>{
+    const ids = getSelectedIds();
+    document.body.removeChild(overlay);
+    if(ids.length===0){ alert2('至少要選一個口味'); return; }
+    await exportFlavorsCsv(ids);
   });
 }
 
@@ -2141,7 +2148,8 @@ function csvField(v){
   if(/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
   return s;
 }
-async function exportAllFlavorsCsv(){
+async function exportFlavorsCsv(selectedIds){
+  const targets = selectedIds ? flavorIndex.filter(f=>selectedIds.includes(f.id)) : flavorIndex;
   const btn = document.getElementById('export-csv-btn');
   if(btn) btn.disabled = true;
   setImportStatus('匯出CSV中…');
@@ -2154,9 +2162,9 @@ async function exportAllFlavorsCsv(){
       '熱量_每100克(大卡)','蛋白質_每100克(克)','脂肪_每100克(克)','飽和脂肪_每100克(克)','反式脂肪_每100克(克)','碳水化合物_每100克(克)','糖_每100克(克)','鈉_每100克(毫克)'
     ];
     const rows = [headers];
-    for(let i=0;i<flavorIndex.length;i++){
-      const idx = flavorIndex[i];
-      setImportStatus(`匯出CSV中…（${i+1}/${flavorIndex.length}）`);
+    for(let i=0;i<targets.length;i++){
+      const idx = targets[i];
+      setImportStatus(`匯出CSV中…（${i+1}/${targets.length}）`);
       const f = (idx.id === activeId) ? activeFlavor : hydrateFlavor(await dbLoadFlavor(idx.id));
       if(!f) continue;
       const calc = calcLabel(f);
@@ -2174,13 +2182,13 @@ async function exportAllFlavorsCsv(){
     const blob = new Blob([csvText], {type:'text/csv;charset=utf-8;'});
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.download = '全部口味標籤資料.csv';
+    link.download = (targets.length===1 ? targets[0].name : '口味標籤資料') + '.csv';
     link.href = url;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    setImportStatus(`CSV匯出完成 ✓ 共 ${flavorIndex.length} 款口味`);
+    setImportStatus(`CSV匯出完成 ✓ 共 ${targets.length} 款口味`);
   }catch(e){
     console.error('csv export failed', e);
     setImportStatus('CSV匯出失敗：' + (e.message||e));
