@@ -1030,6 +1030,7 @@ function renderIngredientsBlock(flavor){
 
 function fullLabelHtml(flavor, calc, opts){
   const showQr = !(opts && opts.hideQr);
+  const showHealthGrade = !(opts && opts.hideHealthGrade);
   const logoImg = brand.logoDataUrl ? `<img class="label-logo" src="${brand.logoDataUrl}" alt="logo">` : '';
   const qrFramed = (showQr && brand.qrDataUrl) ? `<div class="qr-framed-box">${brand.qrCaption?`<div class="qr-framed-caption">${escapeHtml(brand.qrCaption)}</div>`:''}<div class="qr-framed-body"><img class="label-qr" src="${brand.qrDataUrl}" alt="qr"></div></div>` : '';
   const usageQrFramed = (showQr && brand.usageQrDataUrl) ? `<div class="qr-framed-box"><div class="qr-framed-caption">掃描看食用方式</div><div class="qr-framed-body"><img class="label-qr" src="${brand.usageQrDataUrl}" alt="usage qr"></div></div>` : '';
@@ -1058,7 +1059,7 @@ function fullLabelHtml(flavor, calc, opts){
       ${showQr ? `<div class="label-center">${qrFramed}${usageQrFramed ? `<div style="margin-top:6px;">${usageQrFramed}</div>` : ''}</div>` : ''}
       <div style="display:flex;flex-direction:column;justify-content:center;height:100%;">
         ${nutriTableHtml(flavor, calc)}
-        ${healthGradeHtml(flavor, calc.per100Baked)}
+        ${showHealthGrade ? healthGradeHtml(flavor, calc.per100Baked) : ''}
       </div>
     </div>
     </div>`;
@@ -2132,7 +2133,7 @@ async function downloadLabelForThermalPrinter(){
 async function downloadLabelForThermalPrinterNoQr(){
   if(!activeFlavor) return;
   try{
-    const {canvas, size} = await renderLabelCanvas(fullLabelHtml, {hideQr:true});
+    const {canvas, size} = await renderLabelCanvas(fullLabelHtml, {hideQr:true, hideHealthGrade:true});
     thresholdCanvasToBlackWhite(canvas, 190);
     downloadCanvasAsPng(canvas, (activeFlavor.name||'營養標示') + `_熱感印表機${size.w}x${size.h}cm_無QR.png`);
   }catch(e){
