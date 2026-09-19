@@ -98,7 +98,6 @@ window.DEFAULT_STAFF_PIN = "8888";
   /* ---------- final printable label ---------- */
   #label-capture{background:#fff;padding:6px 2px 2px;display:flex;justify-content:center;}
   .label-card{background:#fff;border:1.5px solid var(--ink);border-radius:6px;padding:8px 11px;display:grid;grid-template-columns:1fr 76px 200px;gap:8px;width:500px;box-sizing:border-box;}
-  .label-card.no-qr{grid-template-columns:1fr 200px;width:424px;}
   .label-left{display:flex;flex-direction:column;}
   .label-top{margin-bottom:2px;}
   .label-title{font-family:'Noto Sans TC',sans-serif;font-weight:700;font-size:16px;line-height:1.15;}
@@ -125,18 +124,34 @@ window.DEFAULT_STAFF_PIN = "8888";
   .nutri-table tr.indent td:first-child{padding-left:8px;}
   .nutri-table tr:last-child td{border-bottom:1px solid var(--ink);}
 
-  /* ---------- 精簡版標籤（橫式雙欄，給8x6cm這種寬>高的標籤用，
-     左欄放文字說明、右欄放營養標示表，比全部上下疊放省高度） ---------- */
-  .cl-wrap{width:340px;box-sizing:border-box;background:#fff;border:1.5px solid var(--ink);border-radius:4px;padding:7px 9px;font-family:'Noto Sans TC',sans-serif;color:var(--ink);display:grid;grid-template-columns:1fr 110px;gap:8px;}
-  .cl-left{min-width:0;}
-  .cl-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:4px;line-height:1.2;}
-  .cl-line{font-size:9.5px;margin:2px 0;line-height:1.3;}
-  .cl-line b{font-weight:700;}
-  .cl-ingredients{font-size:9.5px;line-height:1.3;margin:3px 0 5px;}
-  .cl-ingredients b{font-weight:700;}
-  .cl-allergy{font-size:9px;line-height:1.3;margin-top:4px;font-weight:600;}
-  .cl-right{display:flex;flex-direction:column;}
-  .cl-footer{font-size:8px;color:var(--ink-soft);margin-top:6px;padding-top:4px;border-top:1px solid var(--rule);grid-column:1/-1;}
+  /* ---------- 標籤機列印用排版（.pl）：所有輸出檔案共用，字級以 --b 為基準（最小字級=5.5pt），
+     其餘字級按比例放大；--b 由 fitPrintLabel() 在匯出時自動算出「塞得進標籤尺寸的最大值」 ---------- */
+  .pl{box-sizing:border-box;background:#fff;color:var(--ink);font-family:'Noto Sans TC',sans-serif;line-height:1.15;display:grid;align-content:start;gap:3px 5px;padding:4px 5px;overflow:visible;}
+  .pl-title{font-size:calc(var(--b) * 1.6);font-weight:700;line-height:1.1;margin-bottom:1px;display:flex;align-items:center;flex-wrap:wrap;gap:3px;}
+  .pl-left{min-width:0;}
+  .pl-ing,.pl-line{font-size:var(--b);margin:0 0 0.5px;}
+  .pl-ing b,.pl-line b{font-weight:700;}
+  .pl-right{min-width:0;display:flex;flex-direction:column;gap:3px;}
+  .pl-bottom{grid-column:1/-1;border-top:0.5px solid var(--ink);padding-top:2px;font-size:var(--b);display:flex;align-items:center;gap:5px;}
+  .pl-btext{flex:1;min-width:0;}
+  .pl-allergy{font-weight:600;}
+  .pl-foot{margin-top:1px;}
+  .pl .nutri-label{padding:2px 3px;}
+  .pl .nutri-label h4{font-size:calc(var(--b) * 1.15);margin:0 0 1px;padding-bottom:1px;letter-spacing:0;}
+  .pl .nutri-meta{font-size:var(--b);padding-bottom:1px;margin-bottom:0;}
+  .pl .nutri-table{font-size:var(--b);}
+  .pl .nutri-table th{font-size:var(--b);padding:0;}
+  .pl .nutri-table td{padding:0;}
+  .pl .nutri-table tr.indent td:first-child{padding-left:calc(var(--b) * 0.8);}
+  .pl span[style*="border"]{font-size:var(--b) !important;padding:0 2px !important;border-width:0.7px !important;}
+  .pl-qrs{display:flex;gap:3px;flex-shrink:0;}
+  .pl-qr{border:0.7px solid var(--ink);display:flex;flex-direction:column;align-items:center;}
+  .pl-qr .cap{background:var(--ink);color:#fff;font-size:var(--b);font-weight:600;width:100%;text-align:center;line-height:1.35;padding:0.5px 0;}
+  .pl-qr img{display:block;width:calc(var(--b) * 4.6);height:calc(var(--b) * 4.6);margin:1.5px;}
+  .pl-health{margin-top:2px;}
+  .pl-health .bar{display:flex;gap:1px;}
+  .pl-health .bar div{flex:1;text-align:center;font-weight:700;color:#fff;font-size:var(--b);border-radius:1px;line-height:1.2;}
+  .pl-health .cap{font-size:var(--b);color:var(--ink-soft);text-align:center;line-height:1.1;}
   .nutri-foot{font-size:9px;color:var(--ink-soft);margin-top:8px;font-family:'Noto Sans TC',sans-serif;}
   .flavor-list::-webkit-scrollbar{width:5px;}
   .flavor-list::-webkit-scrollbar-thumb{background:#7A6248;border-radius:3px;}
@@ -1028,17 +1043,15 @@ function renderIngredientsBlock(flavor){
   return `<div class="label-ingredients"><b>成份：</b>${escapeHtml(text)}</div>`;
 }
 
-function fullLabelHtml(flavor, calc, opts){
-  const showQr = !(opts && opts.hideQr);
-  const showHealthGrade = !(opts && opts.hideHealthGrade);
+function fullLabelHtml(flavor, calc){
   const logoImg = brand.logoDataUrl ? `<img class="label-logo" src="${brand.logoDataUrl}" alt="logo">` : '';
-  const qrFramed = (showQr && brand.qrDataUrl) ? `<div class="qr-framed-box">${brand.qrCaption?`<div class="qr-framed-caption">${escapeHtml(brand.qrCaption)}</div>`:''}<div class="qr-framed-body"><img class="label-qr" src="${brand.qrDataUrl}" alt="qr"></div></div>` : '';
-  const usageQrFramed = (showQr && brand.usageQrDataUrl) ? `<div class="qr-framed-box"><div class="qr-framed-caption">掃描看食用方式</div><div class="qr-framed-body"><img class="label-qr" src="${brand.usageQrDataUrl}" alt="usage qr"></div></div>` : '';
+  const qrFramed = brand.qrDataUrl ? `<div class="qr-framed-box">${brand.qrCaption?`<div class="qr-framed-caption">${escapeHtml(brand.qrCaption)}</div>`:''}<div class="qr-framed-body"><img class="label-qr" src="${brand.qrDataUrl}" alt="qr"></div></div>` : '';
+  const usageQrFramed = brand.usageQrDataUrl ? `<div class="qr-framed-box"><div class="qr-framed-caption">掃描看食用方式</div><div class="qr-framed-body"><img class="label-qr" src="${brand.usageQrDataUrl}" alt="usage qr"></div></div>` : '';
   const scale = (brand.labelScale || 100) / 100;
 
   return `
     <div style="transform:scale(${scale});transform-origin:top center;">
-    <div class="label-card${showQr?'':' no-qr'}">
+    <div class="label-card">
       <div class="label-left">
         <div class="label-top">
           <div class="label-title" style="display:flex;align-items:center;gap:6px;">${escapeHtml(flavor.name)} ${dietTagHtml(flavor)}</div>
@@ -1056,46 +1069,14 @@ function fullLabelHtml(flavor, calc, opts){
         ${logoImg ? `<div class="label-bottom-row">${logoImg}</div>` : ''}
         <div class="allergy-note">${[escapeHtml(flavor.allergyNote||''), brand.generalNotice?escapeHtml(brand.generalNotice):''].filter(Boolean).join(' ')}</div>
       </div>
-      ${showQr ? `<div class="label-center">${qrFramed}${usageQrFramed ? `<div style="margin-top:6px;">${usageQrFramed}</div>` : ''}</div>` : ''}
+      <div class="label-center">
+        ${qrFramed}${usageQrFramed ? `<div style="margin-top:6px;">${usageQrFramed}</div>` : ''}
+      </div>
       <div style="display:flex;flex-direction:column;justify-content:center;height:100%;">
         ${nutriTableHtml(flavor, calc)}
-        ${showHealthGrade ? healthGradeHtml(flavor, calc.per100Baked) : ''}
+        ${healthGradeHtml(flavor, calc.per100Baked)}
       </div>
     </div>
-    </div>`;
-}
-
-// 精簡版標籤：8×6公分這麼小的標籤，塞不下完整版那些裝飾性/內部參考用的東西
-// （Logo、雙QR框、健康評級這種本來就寫明「僅供內部參考」的區塊），硬塞進去
-// 只會逼字級被壓縮到印不清楚。這裡只留法規上真的需要的核心資訊，換來的空間
-// 拿去把字級加大——原生設計寬度就對應8公分，套進標籤機列印版時幾乎不用再縮放，
-// 字級才不會又被壓小一輪。
-function compactLabelHtml(flavor, calc){
-  const originLine = flavor.originText ? `<div class="cl-line"><b>產地：</b>${escapeHtml(flavor.originText)}</div>` : '';
-  const text = flavor.ingredientsText || '';
-  let ingredientsHtml;
-  if(flavor.ingredientsFormat === 'composition' && text.includes('\n')){
-    const [compLine, ...rest] = text.split('\n');
-    ingredientsHtml = `<div class="cl-ingredients" style="font-weight:700;">${escapeHtml(compLine)}</div><div class="cl-ingredients"><b>成份：</b>${escapeHtml(rest.join(' ').trim())}</div>`;
-  }else{
-    ingredientsHtml = `<div class="cl-ingredients"><b>成份：</b>${escapeHtml(text)}</div>`;
-  }
-  const footerParts = [brand.brandName, brand.contactEmail, brand.igHandle?('IG '+brand.igHandle):''].filter(Boolean).map(escapeHtml);
-  return `
-    <div class="cl-wrap">
-      <div class="cl-left">
-        <div class="cl-title">${escapeHtml(flavor.name)} ${dietTagHtml(flavor)}</div>
-        ${ingredientsHtml}
-        <div class="cl-line"><b>內容量：</b>${flavor.netWeight||0}${flavor.netTolerance?('±'+flavor.netTolerance):''}克</div>
-        <div class="cl-line"><b>保存期限：</b>${escapeHtml(flavor.shelfLife||'')}</div>
-        <div class="cl-line"><b>製造日期：</b>${escapeHtml(flavor.manufactureDate||'')}</div>
-        <div class="cl-line"><b>有效日期：</b>${escapeHtml(flavor.expiryDate||'')}</div>
-        <div class="cl-line"><b>保存方式：</b>${escapeHtml(flavor.storageMethod||'')}</div>
-        ${originLine}
-        <div class="cl-allergy">${[escapeHtml(flavor.allergyNote||''), brand.generalNotice?escapeHtml(brand.generalNotice):''].filter(Boolean).join(' ')}</div>
-      </div>
-      <div class="cl-right">${nutriTableHtml(flavor, calc)}</div>
-      ${footerParts.length ? `<div class="cl-footer">${footerParts.join(' ｜ ')}</div>` : ''}
     </div>`;
 }
 
@@ -1117,7 +1098,6 @@ function renderMain(){
         <button class="btn" id="download-print-label-btn" title="專門給標籤機用的高解析度PNG，不會模糊；列印尺寸可以在下面「品牌設定」裡調整">標籤機列印版</button>
         <button class="btn" id="download-thermal-label-btn" title="給精臣K3這類熱感印表機用，去掉灰階抗鋸齒邊緣，文字比較不會糊">熱感印表機專用版</button>
         <button class="btn" id="download-thermal-noqr-btn" title="拿掉QR框，把空間讓給文字跟營養標示表，字級可以再大一點">熱感印表機專用版（無QR）</button>
-        <button class="btn" id="download-compact-thermal-btn" title="拿掉Logo/QR/健康評級等非必要內容，只留法規需要的核心資訊，換取字級加大＋黑白熱感優化">精簡熱感版（試用）</button>
         <button class="btn primary" id="save-btn">儲存</button>
       </div>
     </div>
@@ -1450,7 +1430,6 @@ function renderMain(){
   document.getElementById('download-print-label-btn').addEventListener('click', downloadLabelForPrinter);
   document.getElementById('download-thermal-label-btn').addEventListener('click', downloadLabelForThermalPrinter);
   document.getElementById('download-thermal-noqr-btn').addEventListener('click', downloadLabelForThermalPrinterNoQr);
-  document.getElementById('download-compact-thermal-btn').addEventListener('click', downloadCompactThermalLabel);
   document.getElementById('parse-import-btn').addEventListener('click', parseRecipeText);
   document.getElementById('parse-import-url-btn').addEventListener('click', parseRecipeFromUrl);
   document.getElementById('batch-download-btn').addEventListener('click', ()=>{
@@ -1937,65 +1916,71 @@ async function aiCostSearchAll(forceAll){
 // ============================================================
 // 匯出（JPG / PDF）— 邏輯不變，仍是純前端 canvas 截圖
 // ============================================================
+// 批次JPG／單張JPG／批次PDF 也都走標籤機排版（見 printLabelHtml 上面的說明），
+// 不然貼到標籤機軟體縮成實際公分數之後，最小的字一樣會縮到5.5pt以下。
+function downloadCanvasAsJpg(canvas, filename){
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = canvas.toDataURL('image/jpeg', 0.95);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 async function batchDownloadAll(selectedIds){
   const originalId = activeId;
   const targets = selectedIds ? flavorIndex.filter(f=>selectedIds.includes(f.id)) : flavorIndex;
   setImportStatus('批次匯出中…');
   const btn = document.getElementById('batch-download-btn');
   if(btn) btn.disabled = true;
+  const notes = [];
   for(const f of targets){
     await loadFlavor(f.id);
-    const calc = calcLabel(activeFlavor);
-    const temp = document.createElement('div');
-    temp.style.position = 'fixed'; temp.style.left = '-9999px'; temp.style.top = '0';
-    temp.innerHTML = fullLabelHtml(activeFlavor, calc);
-    document.body.appendChild(temp);
     try{
-      const canvas = await html2canvas(temp.firstElementChild, {backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true, logging:false});
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-      const link = document.createElement('a');
-      link.download = (activeFlavor.name || '口味') + '.jpg';
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const {canvas, note} = await renderLabelCanvas({showQr:true, showHealth:true});
+      downloadCanvasAsJpg(canvas, (activeFlavor.name || '口味') + '.jpg');
+      if(note) notes.push(note);
     }catch(e){ console.error('batch export failed for', f.name, e); }
-    document.body.removeChild(temp);
     await new Promise(r=>setTimeout(r, 500));
   }
   await loadFlavor(originalId);
   renderSidebar();
   renderMain();
   setImportStatus('批次匯出完成 ✓');
+  if(notes.length) alert2(notes.join('\n'));
   if(btn) btn.disabled = false;
 }
 
+// PDF：每張標籤照實際尺寸（預設8×5公分）排在A4上，一頁放好幾張，印出來就是標籤實際大小。
 async function batchDownloadPdf(selectedIds){
   const originalId = activeId;
   const targets = selectedIds ? flavorIndex.filter(f=>selectedIds.includes(f.id)) : flavorIndex;
   setImportStatus('批次匯出 PDF 中…');
   const btn = document.getElementById('batch-pdf-btn');
   if(btn) btn.disabled = true;
+  const notes = [];
   try{
     if(!window.jspdf || !window.jspdf.jsPDF){ throw new Error('PDF 元件尚未載入完成，請稍等幾秒再試一次'); }
     const { jsPDF } = window.jspdf;
-    let pdf = null;
+    const size = getPrintLabelSizeCm();
+    const labelW = size.w*10, labelH = size.h*10; // mm
+    const pageW = 210, pageH = 297, margin = 10, gap = 4;
+    const cols = Math.max(1, Math.floor((pageW - margin*2 + gap) / (labelW + gap)));
+    const rows = Math.max(1, Math.floor((pageH - margin*2 + gap) / (labelH + gap)));
+    const perPage = cols*rows;
+    let pdf = null, n = 0;
     for(const f of targets){
       await loadFlavor(f.id);
-      const calc = calcLabel(activeFlavor);
-      const temp = document.createElement('div');
-      temp.style.position = 'fixed'; temp.style.left = '-9999px'; temp.style.top = '0';
-      temp.innerHTML = fullLabelHtml(activeFlavor, calc);
-      document.body.appendChild(temp);
-      const canvas = await html2canvas(temp.firstElementChild, {backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true, logging:false});
-      document.body.removeChild(temp);
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const pageW = 210, margin = 10;
-      const imgW = pageW - margin*2;
-      const imgH = imgW * (canvas.height / canvas.width);
+      const {canvas, note} = await renderLabelCanvas({showQr:true, showHealth:true});
+      if(note) notes.push(note);
       if(!pdf){ pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'}); }
-      else { pdf.addPage(); }
-      pdf.addImage(imgData, 'JPEG', margin, margin, imgW, imgH);
+      else if(n % perPage === 0){ pdf.addPage(); }
+      const slot = n % perPage;
+      const x = margin + (slot % cols) * (labelW + gap);
+      const y = margin + Math.floor(slot / cols) * (labelH + gap);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', x, y, labelW, labelH);
+      pdf.setDrawColor(190); pdf.setLineWidth(0.1); pdf.rect(x, y, labelW, labelH);
+      n++;
     }
     if(pdf) pdf.save('全部口味營養標示.pdf');
     setImportStatus('PDF 匯出完成 ✓');
@@ -2006,20 +1991,16 @@ async function batchDownloadPdf(selectedIds){
   await loadFlavor(originalId);
   renderSidebar();
   renderMain();
+  if(notes.length) alert2(notes.join('\n'));
   if(btn) btn.disabled = false;
 }
 
 async function downloadJpg(){
-  const el = document.getElementById('label-capture');
+  if(!activeFlavor) return;
   try{
-    const canvas = await html2canvas(el, {backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true, logging:false});
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-    const link = document.createElement('a');
-    link.download = (activeFlavor.name||'營養標示') + '.jpg';
-    link.href = dataUrl;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const {canvas, note} = await renderLabelCanvas({showQr:true, showHealth:true});
+    downloadCanvasAsJpg(canvas, (activeFlavor.name||'營養標示') + '.jpg');
+    if(note) alert2(note);
   }catch(e){
     console.error('JPG export failed', e);
     alert2('JPG匯出失敗：' + (e.message||e));
@@ -2061,35 +2042,126 @@ function thresholdCanvasToBlackWhite(canvas, threshold){
   ctx.putImageData(imgData, 0, 0);
 }
 
-// 給標籤機用的版本：原本「下載JPG」是照電腦螢幕的排版尺寸截圖，
-// 貼到標籤機軟體裡設成實際公分數列印時，像素密度太低會被拉伸放大變模糊。
-// 這裡改成：先把整份標籤內容等比例縮放到剛好塞進設定的公分尺寸畫布裡（不拉伸變形、不裁切），
-// 再用600 DPI（一般標籤機/雷射印表機清晰列印+可掃描的解析度）去截圖。
-async function renderLabelCanvas(htmlBuilder, htmlOpts){
-  const calc = calcLabel(activeFlavor);
-  const CSS_PX_PER_CM = 96/2.54; // 瀏覽器CSS的參考基準：96px = 1英吋 = 2.54公分
-  const size = getPrintLabelSizeCm();
-  const boxWpx = size.w * CSS_PX_PER_CM, boxHpx = size.h * CSS_PX_PER_CM;
+// ------------------------------------------------------------
+// 所有「輸出檔案」（JPG／PNG／PDF）共用同一套標籤機排版：
+// 1. 版面直接用標籤實際的公分數排（預設8×5），不是先排一張大圖再縮小——
+//    以前是把500px寬的畫面硬縮進8公分，最小的字被縮到不到4pt，怎麼調解析度都糊。
+// 2. 字級以 --b 為基準：最小的字 = PRINT_MIN_FONT_PT（5.5pt），其他字級按比例放大
+//    （標題1.6倍、營養標示標題1.15倍，其餘都是1倍）。
+// 3. 5.5pt先放得下的話，再把所有字級「等比例一起放大」到剛好塞滿標籤為止。
+// 4. 5.5pt都放不下，依序自動省略：健康評級 → QR碼；再放不下才會縮到低於5.5pt並提醒。
+// ------------------------------------------------------------
+const PRINT_MIN_FONT_PT = 5.5;
+const PRINT_DPI = 600;
+
+function printLabelHtml(flavor, calc, o){
+  const text = flavor.ingredientsText || '';
+  let ingredientsHtml;
+  if(flavor.ingredientsFormat === 'composition' && text.includes('\n')){
+    const [compLine, ...rest] = text.split('\n');
+    ingredientsHtml = `<div class="pl-ing" style="font-weight:700;">${escapeHtml(compLine)}</div><div class="pl-ing"><b>成份：</b>${escapeHtml(rest.join(' ').trim())}</div>`;
+  }else{
+    ingredientsHtml = `<div class="pl-ing"><b>成份：</b>${escapeHtml(text)}</div>`;
+  }
+  const lines = [
+    ['內容量：', `${flavor.netWeight||0}${flavor.netTolerance?('±'+flavor.netTolerance):''}克`],
+    ['保存期限：', flavor.shelfLife||''],
+    ['製造日期：', flavor.manufactureDate||''],
+    ['有效日期：', flavor.expiryDate||''],
+    ['保存方式：', flavor.storageMethod||''],
+  ];
+  if(flavor.originText) lines.push(['產地：', flavor.originText]);
+  const footParts = [brand.brandName?('製造商：'+brand.brandName):'', brand.contactEmail, brand.igHandle?('IG '+brand.igHandle):''].filter(Boolean).map(escapeHtml);
+
+  let qrHtml = '';
+  if(o.showQr){
+    const box = (url, cap)=>`<div class="pl-qr">${cap?`<div class="cap">${escapeHtml(cap)}</div>`:''}<img src="${url}" alt=""></div>`;
+    const boxes = [brand.qrDataUrl?box(brand.qrDataUrl, brand.qrCaption):'', brand.usageQrDataUrl?box(brand.usageQrDataUrl, '食用方式'):''].filter(Boolean);
+    if(boxes.length) qrHtml = `<div class="pl-qrs">${boxes.join('')}</div>`;
+  }
+  let healthHtml = '';
+  if(o.showHealth){
+    const hs = calcBagelHealthScore(flavor, calc.per100Baked);
+    const colors = {A:'#1B7A3D', B:'#84BD3C', C:'#F5C623', D:'#F0932B', E:'#D9432E'};
+    healthHtml = `<div class="pl-health"><div class="bar">${['A','B','C','D','E'].map(l=>`<div style="background:${colors[l]};opacity:${l===hs.grade?1:0.3};">${l}</div>`).join('')}</div><div class="cap">貝果健康評級（僅供參考）</div></div>`;
+  }
+
+  return `
+    <div class="pl" style="--b:${o.b}px;width:${o.boxW}px;height:${o.boxH}px;grid-template-columns:1fr ${o.rightW}px;">
+      <div class="pl-left">
+        <div class="pl-title">${escapeHtml(flavor.name)} ${dietTagHtml(flavor)}</div>
+        ${ingredientsHtml}
+        ${lines.map(l=>`<div class="pl-line"><b>${l[0]}</b>${escapeHtml(l[1])}</div>`).join('')}
+        ${healthHtml}
+      </div>
+      <div class="pl-right">${nutriTableHtml(flavor, calc)}</div>
+      <div class="pl-bottom">
+        <div class="pl-btext">
+          <div class="pl-allergy">${[escapeHtml(flavor.allergyNote||''), brand.generalNotice?escapeHtml(brand.generalNotice):''].filter(Boolean).join(' ')}</div>
+          ${footParts.length ? `<div class="pl-foot">${footParts.join(' ｜ ')}</div>` : ''}
+        </div>
+        ${qrHtml}
+      </div>
+    </div>`;
+}
+
+// 找出「塞得進標籤尺寸的最大 --b」。回傳的 wrapper 已經插在畫面外，呼叫端用完要自己移除。
+function fitPrintLabel(flavor, calc, size, opts){
+  const CSS_PX_PER_CM = 96/2.54;
+  const boxW = size.w * CSS_PX_PER_CM, boxH = size.h * CSS_PX_PER_CM;
+  const bMin = PRINT_MIN_FONT_PT * 96 / 72;
+  const hasQr = !!(brand.qrDataUrl || brand.usageQrDataUrl);
+  const wantQr = !!opts.showQr && hasQr, wantHealth = !!opts.showHealth;
 
   const wrapper = document.createElement('div');
-  wrapper.style.cssText = `position:fixed;left:-9999px;top:0;width:${boxWpx}px;height:${boxHpx}px;background:#fff;overflow:hidden;box-sizing:border-box;display:flex;align-items:center;justify-content:center;`;
-  const inner = document.createElement('div');
-  inner.innerHTML = (htmlBuilder||fullLabelHtml)(activeFlavor, calc, htmlOpts);
-  wrapper.appendChild(inner);
+  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;';
   document.body.appendChild(wrapper);
+  const render = (b, v)=>{
+    wrapper.innerHTML = printLabelHtml(flavor, calc, {b, boxW, boxH, rightW: Math.round(b*18.4), showQr: v.showQr, showHealth: v.showHealth});
+    return wrapper.firstElementChild;
+  };
+  const fits = (b, v)=>{
+    const el = render(b, v);
+    return el.scrollHeight <= el.clientHeight + 1 && el.scrollWidth <= el.clientWidth + 1;
+  };
 
+  const variants = [{showQr:wantQr, showHealth:wantHealth, dropped:[]}];
+  if(wantHealth) variants.push({showQr:wantQr, showHealth:false, dropped:['健康評級']});
+  if(wantQr) variants.push({showQr:false, showHealth:false, dropped:[...(wantHealth?['健康評級']:[]), 'QR碼']});
+
+  for(const v of variants){
+    if(fits(bMin, v)){
+      let lo = bMin, hi = bMin * 2.5;
+      for(let i=0;i<14;i++){ const mid = (lo+hi)/2; if(fits(mid, v)) lo = mid; else hi = mid; }
+      const el = render(lo, v);
+      return {wrapper, el, b:lo, dropped:v.dropped, belowMin:false};
+    }
+  }
+  const v = variants[variants.length-1];
+  let lo = bMin * 0.3, hi = bMin;
+  for(let i=0;i<14;i++){ const mid = (lo+hi)/2; if(fits(mid, v)) lo = mid; else hi = mid; }
+  const el = render(lo, v);
+  return {wrapper, el, b:lo, dropped:v.dropped, belowMin:true};
+}
+
+function printFitNote(name, fit){
+  const notes = [];
+  if(fit.dropped.length) notes.push('空間不夠，已自動省略：' + fit.dropped.join('、'));
+  if(fit.belowMin) notes.push(`內容太多，最小字級只能縮到約 ${(fit.b*72/96).toFixed(1)}pt，低於 ${PRINT_MIN_FONT_PT}pt`);
+  return notes.length ? `「${name}」${notes.join('；')}` : '';
+}
+
+// opts: {showQr, showHealth}。flavor 預設用目前畫面上的口味。
+async function renderLabelCanvas(opts, flavor){
+  const f = flavor || activeFlavor;
+  const calc = calcLabel(f);
+  const size = getPrintLabelSizeCm();
+  const fit = fitPrintLabel(f, calc, size, opts || {showQr:true, showHealth:true});
   try{
-    const rect = inner.getBoundingClientRect();
-    const fitScale = Math.min(boxWpx/rect.width, boxHpx/rect.height, 1);
-    inner.style.transformOrigin = 'center center';
-    inner.style.transform = `scale(${fitScale})`;
-
-    const PRINT_DPI = 600;
-    const renderScale = PRINT_DPI / 96;
-    const canvas = await html2canvas(wrapper, {backgroundColor:'#ffffff', scale: renderScale, useCORS:true, allowTaint:true, logging:false});
-    return {canvas, size};
+    const canvas = await html2canvas(fit.el, {backgroundColor:'#ffffff', scale: PRINT_DPI/96, useCORS:true, allowTaint:true, logging:false});
+    return {canvas, size, note: printFitNote(f.name, fit)};
   }finally{
-    document.body.removeChild(wrapper);
+    document.body.removeChild(fit.wrapper);
   }
 }
 
@@ -2106,53 +2178,41 @@ function downloadCanvasAsPng(canvas, filename){
 async function downloadLabelForPrinter(){
   if(!activeFlavor) return;
   try{
-    const {canvas, size} = await renderLabelCanvas();
+    const {canvas, size, note} = await renderLabelCanvas({showQr:true, showHealth:true});
     downloadCanvasAsPng(canvas, (activeFlavor.name||'營養標示') + `_標籤機${size.w}x${size.h}cm_600dpi.png`);
+    if(note) alert2(note);
   }catch(e){
     console.error('label printer export failed', e);
     alert2('標籤機列印版匯出失敗：' + (e.message||e));
   }
 }
 
-// 熱感印表機專用版：跟上面同一份畫布，但多一道二值化，去掉灰階抗鋸齒邊緣，
+// 熱感印表機專用版：跟上面同一份排版，但多一道二值化，去掉灰階抗鋸齒邊緣，
 // 給像精臣K3這類熱感式印表機用（印不出真灰階、遇到灰邊容易糊）。
 async function downloadLabelForThermalPrinter(){
   if(!activeFlavor) return;
   try{
-    const {canvas, size} = await renderLabelCanvas();
+    const {canvas, size, note} = await renderLabelCanvas({showQr:true, showHealth:true});
     thresholdCanvasToBlackWhite(canvas, 190);
     downloadCanvasAsPng(canvas, (activeFlavor.name||'營養標示') + `_熱感印表機${size.w}x${size.h}cm_黑白.png`);
+    if(note) alert2(note);
   }catch(e){
     console.error('thermal label export failed', e);
     alert2('熱感印表機專用版匯出失敗：' + (e.message||e));
   }
 }
 
-// 拿掉QR框（連同旁邊那一整欄一起收掉，不是留空白），把省下來的寬度讓給
-// 左邊文字跟右邊營養標示表，兩邊都能分到更多空間、字級可以再大一點。
+// 不放QR碼跟健康評級，空間全部留給文字，等比例放大的幅度最大。
 async function downloadLabelForThermalPrinterNoQr(){
   if(!activeFlavor) return;
   try{
-    const {canvas, size} = await renderLabelCanvas(fullLabelHtml, {hideQr:true, hideHealthGrade:true});
+    const {canvas, size, note} = await renderLabelCanvas({showQr:false, showHealth:false});
     thresholdCanvasToBlackWhite(canvas, 190);
     downloadCanvasAsPng(canvas, (activeFlavor.name||'營養標示') + `_熱感印表機${size.w}x${size.h}cm_無QR.png`);
+    if(note) alert2(note);
   }catch(e){
     console.error('thermal label (no qr) export failed', e);
     alert2('熱感印表機專用版（無QR）匯出失敗：' + (e.message||e));
-  }
-}
-
-// 精簡版：拿掉Logo/雙QR框/健康評級這些非必要內容，換取字級可以大一點，
-// 同時套用跟熱感印表機專用版一樣的黑白二值化。
-async function downloadCompactThermalLabel(){
-  if(!activeFlavor) return;
-  try{
-    const {canvas, size} = await renderLabelCanvas(compactLabelHtml);
-    thresholdCanvasToBlackWhite(canvas, 190);
-    downloadCanvasAsPng(canvas, (activeFlavor.name||'營養標示') + `_精簡熱感${size.w}x${size.h}cm.png`);
-  }catch(e){
-    console.error('compact thermal label export failed', e);
-    alert2('精簡熱感印表機版匯出失敗：' + (e.message||e));
   }
 }
 
